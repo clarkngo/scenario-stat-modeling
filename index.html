@@ -1,0 +1,99 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Scenario-Driven Statistical Modeling</title>
+<meta name="description" content="DS 623 research portal: derive OLS from scratch, shock it, and revise it into Huber regression — all in NumPy and in the browser.">
+<link rel="stylesheet" href="style.css">
+<script>
+  window.MathJax = { tex: { inlineMath: [["\\(", "\\)"]] }, svg: { fontCache: "global" }, startup: { typeset: false } };
+</script>
+<script defer src="https://cdn.jsdelivr.net/npm/mathjax@3.2.2/es5/tex-svg.js"></script>
+<script defer src="script.js"></script>
+</head>
+<body>
+<header class="topbar">
+  <a class="brand" href="#top">DS 623 · Scenario-Driven Modeling</a>
+  <nav class="toplinks">
+    <a href="#lab">Lab</a>
+    <a href="#code">Code</a>
+    <a href="presentations/ds623-scenario-stat-modeling.html">Slides</a>
+    <a href="https://github.com/clarkngo/scenario-stat-modeling">GitHub</a>
+    <button id="themeToggle" class="ghost" aria-label="Toggle dark mode">◐</button>
+  </nav>
+</header>
+
+<div class="layout">
+  <aside class="toc" aria-label="Outline">
+    <div class="toc-title">Outline</div>
+    <ol id="tocList"></ol>
+  </aside>
+
+  <main id="top">
+    <section class="hero">
+      <div class="kicker" id="course"></div>
+      <h1 id="paperTitle"></h1>
+      <p class="byline" id="byline"></p>
+      <p class="status" id="status"></p>
+      <div class="loop" aria-label="Framework stages">
+        <span>Derive</span><i>→</i><span>Implement</span><i>→</i><span class="shock">Shock</span><i>→</i><span>Diagnose</span><i>→</i><span>Revise</span>
+      </div>
+    </section>
+
+    <section id="abstract" class="paper-section">
+      <h2>Abstract</h2>
+      <p id="abstractText"></p>
+      <p class="keywords"><b>Keywords:</b> <span id="keywords"></span></p>
+    </section>
+
+    <section id="lab" class="paper-section lab">
+      <h2>Interactive Lab: Shock the Baseline</h2>
+      <p class="muted">Both estimators run in your browser on a one-feature slice of the scenario (price vs. size). Move the shock and watch which line follows the market.</p>
+      <div class="controls">
+        <label>Shocked rows <output id="cOut">10%</output>
+          <input type="range" id="cIn" min="0" max="40" step="1" value="10"></label>
+        <label>Shock factor <output id="fOut">×10</output>
+          <input type="range" id="fIn" min="1" max="10" step="0.5" value="10"></label>
+        <label>Huber δ <output id="dOut">1.345</output>
+          <input type="range" id="dIn" min="0.5" max="5" step="0.005" value="1.345"></label>
+        <button id="reseed" class="ghost">New sample</button>
+      </div>
+      <div class="lab-grid">
+        <figure class="chart-wrap">
+          <div class="legend">
+            <span><i class="sw ols"></i>OLS (original)</span>
+            <span><i class="sw hub"></i>Huber-IRLS (revised)</span>
+            <span><i class="sw pt"></i>clean row</span>
+            <span><i class="sw out"></i>shocked row</span>
+          </div>
+          <svg id="chart" role="img" aria-label="Scatter of price versus size with OLS and Huber fit lines"></svg>
+          <div id="tip" class="tip" hidden></div>
+          <figcaption class="muted">Point opacity = Huber weight wᵢ. Shocked rows above the plot are drawn on the top edge.</figcaption>
+        </figure>
+        <div class="metrics" id="metrics"></div>
+      </div>
+      <div class="socratic">
+        <b>Socratic checkpoint.</b> Set δ to its maximum. Why does Huber start to behave like OLS? Then set the shock to 40%: which assumption in Table 1 is now doing the damage?
+      </div>
+    </section>
+
+    <div id="paperBody"></div>
+
+    <section id="code" class="paper-section">
+      <h2>10. Appendix &amp; Implementation</h2>
+      <div class="tabs" role="tablist">
+        <button role="tab" class="tab active" data-file="model/baseline.py" aria-selected="true">Original · OLS</button>
+        <button role="tab" class="tab" data-file="model/revised.py" aria-selected="false">Revised · Huber-IRLS</button>
+        <button role="tab" class="tab" data-file="model/run_experiment.py" aria-selected="false">Experiment</button>
+      </div>
+      <pre class="code"><code id="codeView">Loading…</code></pre>
+      <h3>GitHub Repository &amp; Deployment Blueprint</h3>
+      <p id="blueprint"></p>
+    </section>
+
+    <footer class="foot muted">Clark Jason Ngo · DS 623 · City University of Seattle · Synthetic prototype data; no external ML libraries.</footer>
+  </main>
+</div>
+</body>
+</html>

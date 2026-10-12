@@ -1,0 +1,499 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Scenario-Driven Statistical Modeling</title>
+<style>
+  :root {
+    --bg: #0f1115;
+    --bg-soft: #161922;
+    --fg: #e8eaf0;
+    --fg-dim: #9aa2b1;
+    --accent: #5b8cff;
+    --accent-soft: rgba(91, 140, 255, 0.14);
+    --border: #262b38;
+    --ok: #35c78a;
+    --warn: #f0b429;
+    --danger: #ef5a6f;
+    --mono: "SF Mono", ui-monospace, Menlo, Consolas, monospace;
+    --sans: -apple-system, BlinkMacSystemFont, "Segoe UI", Inter, Roboto, sans-serif;
+  }
+  * { box-sizing: border-box; }
+  html, body {
+    margin: 0; padding: 0; height: 100%;
+    background: var(--bg); color: var(--fg);
+    font-family: var(--sans);
+    overflow: hidden;
+  }
+  #deck {
+    position: relative;
+    width: 100vw; height: 100vh;
+  }
+  .slide {
+    position: absolute; inset: 0;
+    display: none;
+    flex-direction: column;
+    justify-content: center;
+    padding: clamp(24px, 6vw, 96px);
+    opacity: 0;
+    transition: opacity 0.25s ease;
+  }
+  .slide.active { display: flex; opacity: 1; }
+  .kicker {
+    font-size: clamp(11px, 1.1vw, 14px);
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    color: var(--accent);
+    font-weight: 600;
+    margin-bottom: 14px;
+  }
+  h1 {
+    font-size: clamp(28px, 4.2vw, 56px);
+    line-height: 1.1;
+    margin: 0 0 18px;
+    font-weight: 700;
+    letter-spacing: -0.01em;
+  }
+  h2 {
+    font-size: clamp(22px, 3vw, 38px);
+    margin: 0 0 24px;
+    font-weight: 700;
+    letter-spacing: -0.01em;
+  }
+  .subtitle {
+    font-size: clamp(15px, 1.6vw, 20px);
+    color: var(--fg-dim);
+    margin: 0 0 8px;
+    max-width: 900px;
+    line-height: 1.5;
+  }
+  .byline {
+    margin-top: 40px;
+    font-size: clamp(13px, 1.3vw, 16px);
+    color: var(--fg-dim);
+  }
+  .byline strong { color: var(--fg); font-weight: 600; }
+  .content {
+    max-width: 1100px;
+  }
+  .lede {
+    font-size: clamp(16px, 1.7vw, 21px);
+    color: var(--fg-dim);
+    line-height: 1.6;
+    max-width: 820px;
+    margin-bottom: 8px;
+  }
+  ul.points {
+    list-style: none;
+    margin: 24px 0 0;
+    padding: 0;
+    display: grid;
+    gap: 14px;
+  }
+  ul.points li {
+    display: flex;
+    gap: 14px;
+    align-items: baseline;
+    font-size: clamp(14px, 1.4vw, 18px);
+    line-height: 1.5;
+    color: var(--fg);
+  }
+  ul.points li::before {
+    content: "";
+    flex: none;
+    width: 6px; height: 6px;
+    border-radius: 50%;
+    background: var(--accent);
+    margin-top: 8px;
+  }
+  ul.points li b { color: var(--fg); }
+  ul.points li span.dim { color: var(--fg-dim); }
+
+  .grid {
+    display: grid;
+    gap: 14px;
+    margin-top: 20px;
+  }
+  .grid.cols-2 { grid-template-columns: repeat(2, 1fr); }
+  .grid.cols-3 { grid-template-columns: repeat(3, 1fr); }
+  .card {
+    background: var(--bg-soft);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 16px 18px;
+  }
+  .card .label {
+    font-size: 11px; letter-spacing: 0.08em; text-transform: uppercase;
+    color: var(--accent); font-weight: 700; margin-bottom: 8px;
+  }
+  .card .body { font-size: 14px; color: var(--fg-dim); line-height: 1.5; }
+  .card .body b { color: var(--fg); }
+
+  table.deck-table {
+    width: 100%;
+    border-collapse: collapse;
+    margin-top: 18px;
+    font-size: clamp(12px, 1.1vw, 15px);
+  }
+  table.deck-table th, table.deck-table td {
+    text-align: left;
+    padding: 10px 14px;
+    border-bottom: 1px solid var(--border);
+    vertical-align: top;
+  }
+  table.deck-table th {
+    color: var(--accent);
+    font-size: 11px;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    font-weight: 700;
+  }
+  table.deck-table td { color: var(--fg-dim); }
+  table.deck-table td b { color: var(--fg); }
+
+  .pill {
+    display: inline-block;
+    padding: 3px 10px;
+    border-radius: 999px;
+    font-size: 12px;
+    font-weight: 600;
+  }
+  .pill.pass { background: rgba(53,199,138,0.15); color: var(--ok); border: 1px solid rgba(53,199,138,0.4); }
+  .pill.fail { background: rgba(239,90,111,0.15); color: var(--danger); border: 1px solid rgba(239,90,111,0.4); }
+  .pill.hitl { background: rgba(240,180,41,0.15); color: var(--warn); border: 1px solid rgba(240,180,41,0.4); }
+
+  .flow {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 10px;
+    margin-top: 24px;
+  }
+  .flow .step {
+    background: var(--bg-soft);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 10px 16px;
+    font-size: clamp(12px, 1.2vw, 15px);
+    font-weight: 600;
+  }
+  .flow .arrow { color: var(--fg-dim); font-size: 18px; }
+
+  .layers {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    margin-top: 22px;
+    max-width: 720px;
+  }
+  .layers .layer {
+    border-radius: 8px;
+    padding: 12px 18px;
+    font-size: clamp(13px, 1.3vw, 16px);
+    font-weight: 600;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+  }
+  .layers .layer span.n { color: var(--fg-dim); font-weight: 400; font-size: 0.85em; }
+  .layers .l1 { background: rgba(91,140,255,0.16); border: 1px solid rgba(91,140,255,0.35); }
+  .layers .l2 { background: rgba(53,199,138,0.14); border: 1px solid rgba(53,199,138,0.32); }
+  .layers .l3 { background: rgba(240,180,41,0.14); border: 1px solid rgba(240,180,41,0.32); }
+  .layers .l4 { background: rgba(239,90,111,0.14); border: 1px solid rgba(239,90,111,0.32); }
+  .layers .l5 { background: rgba(160,120,255,0.14); border: 1px solid rgba(160,120,255,0.32); }
+
+  .links {
+    margin-top: 32px;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 12px;
+  }
+  .links a {
+    color: var(--bg);
+    background: var(--accent);
+    text-decoration: none;
+    font-weight: 700;
+    font-size: 14px;
+    padding: 10px 18px;
+    border-radius: 8px;
+  }
+  .links a.secondary {
+    color: var(--fg);
+    background: transparent;
+    border: 1px solid var(--border);
+  }
+
+  footer.chrome {
+    position: fixed;
+    left: 0; right: 0; bottom: 0;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 14px 28px;
+    font-size: 12px;
+    color: var(--fg-dim);
+    pointer-events: none;
+  }
+  .progress-track {
+    position: fixed;
+    left: 0; right: 0; bottom: 0;
+    height: 3px;
+    background: var(--border);
+  }
+  .progress-bar {
+    height: 100%;
+    background: var(--accent);
+    transition: width 0.25s ease;
+  }
+  .nav-hint {
+    display: flex; gap: 6px; align-items: center;
+  }
+  kbd {
+    background: var(--bg-soft);
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    padding: 1px 6px;
+    font-family: var(--mono);
+    font-size: 11px;
+  }
+  .navbtn {
+    position: fixed;
+    top: 50%; transform: translateY(-50%);
+    background: var(--bg-soft);
+    border: 1px solid var(--border);
+    color: var(--fg);
+    width: 40px; height: 40px;
+    border-radius: 50%;
+    cursor: pointer;
+    font-size: 16px;
+    pointer-events: auto;
+    display: flex; align-items: center; justify-content: center;
+    opacity: 0.5;
+    transition: opacity 0.15s;
+  }
+  .navbtn:hover { opacity: 1; }
+  #prevBtn { left: 20px; }
+  #nextBtn { right: 20px; }
+
+  code.k {
+    font-family: var(--mono);
+    background: var(--bg-soft);
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    padding: 1px 6px;
+    color: var(--accent);
+    font-size: 0.85em;
+  }
+
+  .eqn { font-size: clamp(15px, 1.7vw, 22px); margin: 18px 0; color: var(--fg); }
+  .figure-card { background: #fff; border-radius: 10px; padding: 10px; display: inline-block; margin-top: 16px; }
+  .figure-card img { display: block; max-height: 52vh; max-width: 100%; }
+  .two { display: grid; grid-template-columns: 1fr 1fr; gap: 28px; align-items: center; }
+  table.deck-table td.num, table.deck-table th.num { text-align: right; font-variant-numeric: tabular-nums; }
+  .flow .step.shock { border-color: var(--danger); color: var(--danger); }
+  @media (max-width: 760px) { .two, .grid.cols-3, .grid.cols-2 { grid-template-columns: 1fr; } .navbtn { display: none; } }
+</style>
+<script>window.MathJax = { svg: { fontCache: "global" } };</script>
+<script defer src="https://cdn.jsdelivr.net/npm/mathjax@3.2.2/es5/tex-svg.js"></script>
+</head>
+<body>
+
+<div id="deck">
+
+  <section class="slide active">
+    <div class="kicker">DS 623 — Math and Statistics for Data Science</div>
+    <h1>Scenario-Driven Statistical Modeling</h1>
+    <p class="subtitle">An AI-guided framework for deriving and revising algorithmic baselines from scratch</p>
+    <div class="byline"><strong>Clark Jason Ngo</strong> — MS in Data Science, City University of Seattle</div>
+  </section>
+
+  <section class="slide">
+    <div class="kicker">Problem</div>
+    <h2>A fitting routine never tells you which assumption it broke</h2>
+    <div class="content">
+      <p class="lede">Learners meet estimators as finished formulas or one-line library calls. When real data violate an assumption, the routine still returns coefficients — silently wrong ones.</p>
+      <ul class="points">
+        <li><b>Hidden assumptions</b> <span class="dim">— listed once in a textbook, then forgotten</span></li>
+        <li><b>Silent failure</b> <span class="dim">— a model can fit training data while learning the wrong relationship</span></li>
+        <li><b>Research question</b> <span class="dim">— can AI-guided scenario shocks help learners derive, stress-test, and revise baselines from first principles?</span></li>
+      </ul>
+    </div>
+  </section>
+
+  <section class="slide">
+    <div class="kicker">Framework</div>
+    <h2>Five stages, guided by Socratic questions</h2>
+    <div class="content">
+      <div class="flow">
+        <div class="step">Derive</div><div class="arrow">→</div>
+        <div class="step">Implement</div><div class="arrow">→</div>
+        <div class="step shock">Shock</div><div class="arrow">→</div>
+        <div class="step">Diagnose</div><div class="arrow">→</div>
+        <div class="step">Revise</div>
+      </div>
+      <div class="grid cols-3" style="margin-top:28px">
+        <div class="card"><div class="label">Constraint</div><div class="body">Pure <b>NumPy</b>. No scikit-learn, PyTorch, or SciPy fitting.</div></div>
+        <div class="card"><div class="label">AI tutor role</div><div class="body">Asks <b>which assumption</b> failed; never hands over the fix.</div></div>
+        <div class="card"><div class="label">Evaluation</div><div class="body">Train on <b>shocked</b> data, test on <b>clean</b> data.</div></div>
+      </div>
+    </div>
+  </section>
+
+  <section class="slide">
+    <div class="kicker">Baseline · Section 2</div>
+    <h2>Ordinary least squares, derived</h2>
+    <div class="content">
+      <div class="eqn">\[ \mathcal{L}(\beta) = \tfrac{1}{2n}\lVert y - X\beta\rVert_2^2 \qquad \nabla_\beta\mathcal{L} = -\tfrac{1}{n}X^\top(y - X\beta) = 0 \]</div>
+      <div class="eqn">\[ \hat\beta_{\text{OLS}} = (X^\top X)^{-1}X^\top y \]</div>
+      <ul class="points">
+        <li><b>Convex</b> <span class="dim">— Hessian XᵀX/n is PSD, so the stationary point is global</span></li>
+        <li><b>MLE under Gaussian noise</b> <span class="dim">— and BLUE by Gauss–Markov</span></li>
+        <li><b>Influence ψ(r) = r</b> <span class="dim">— unbounded: breakdown point 0</span></li>
+      </ul>
+    </div>
+  </section>
+
+  <section class="slide">
+    <div class="kicker">Scenario shock · Sections 3–4</div>
+    <h2>A unit-entry error records prices ×10</h2>
+    <div class="content two">
+      <div>
+        <p class="lede">During a listing-system migration, a share of training prices is entered ten times too large. The test set stays clean.</p>
+        <ul class="points">
+          <li><b>Targets</b> <span class="dim">— the light-tailed Gaussian error assumption</span></li>
+          <li><b>Data</b> <span class="dim">— synthetic, known β = (300, 85, −20), σ = 40</span></li>
+          <li><b>Protocol</b> <span class="dim">— 200 replications per shock level</span></li>
+        </ul>
+      </div>
+      <div class="figure-card"><img src="../assets/fig_fit.png" alt="OLS line pulled toward shocked rows; Huber line follows clean data"></div>
+    </div>
+  </section>
+
+  <section class="slide">
+    <div class="kicker">Revision · Section 5</div>
+    <h2>Keep the line, change the loss</h2>
+    <div class="content">
+      <div class="eqn">\[ \rho_\delta(u)=\begin{cases}\tfrac12u^2 & |u|\le\delta\\ \delta|u|-\tfrac12\delta^2 & |u|>\delta\end{cases} \qquad \psi_\delta(u)=\operatorname{clip}(u,-\delta,\delta) \]</div>
+      <div class="eqn">\[ w_i=\min\!\left(1,\tfrac{\delta}{|u_i|}\right) \qquad \hat\beta^{(t+1)}=(X^\top W X)^{-1}X^\top W y \]</div>
+      <ul class="points">
+        <li><b>Bounded influence</b> <span class="dim">— no single row can move β̂ more than δ allows</span></li>
+        <li><b>δ = 1.345</b> <span class="dim">— ≈95% of OLS efficiency when errors really are Gaussian</span></li>
+        <li><b>IRLS</b> <span class="dim">— solve a weighted LS on √w-scaled rows until β̂ stops moving</span></li>
+      </ul>
+    </div>
+  </section>
+
+  <section class="slide">
+    <div class="kicker">Results · Section 6</div>
+    <h2>Huber holds the noise floor through 20% contamination</h2>
+    <div class="content two">
+      <table class="deck-table">
+        <tr><th>Shock</th><th class="num">OLS RMSE</th><th class="num">Huber RMSE</th></tr>
+        <tr><td><b>0%</b></td><td class="num">40.3</td><td class="num">40.3</td></tr>
+        <tr><td><b>5%</b></td><td class="num">157.2</td><td class="num">40.5</td></tr>
+        <tr><td><b>10%</b></td><td class="num">297.3</td><td class="num">41.3</td></tr>
+        <tr><td><b>20%</b></td><td class="num">573.9</td><td class="num">45.5</td></tr>
+        <tr><td><b>30%</b></td><td class="num">852.6</td><td class="num">62.0</td></tr>
+      </table>
+      <div class="figure-card"><img src="../assets/fig_sweep.png" alt="Test RMSE versus contamination for OLS and Huber"></div>
+    </div>
+  </section>
+
+  <section class="slide">
+    <div class="kicker">Comparison</div>
+    <h2>Original vs. revised</h2>
+    <div class="content">
+      <table class="deck-table">
+        <tr><th>Property</th><th>OLS</th><th>Huber-IRLS</th></tr>
+        <tr><td><b>Influence</b></td><td>Unbounded</td><td>Bounded by δ</td></tr>
+        <tr><td><b>Solve</b></td><td>One least-squares solve</td><td>~10–17 weighted solves</td></tr>
+        <tr><td><b>Gaussian efficiency</b></td><td>100%</td><td>≈95%</td></tr>
+        <tr><td><b>Vertical outliers</b></td><td><span class="pill fail">Breaks</span></td><td><span class="pill pass">Robust</span></td></tr>
+        <tr><td><b>Leverage points</b></td><td><span class="pill fail">Breaks</span></td><td><span class="pill hitl">Not addressed</span></td></tr>
+      </table>
+    </div>
+  </section>
+
+  <section class="slide">
+    <div class="kicker">Discussion</div>
+    <h2>The shock exposed an assumption, not a bug</h2>
+    <div class="content">
+      <ul class="points">
+        <li><b>Targeted revision</b> <span class="dim">— linear structure kept; only the loss changed</span></li>
+        <li><b>Why Huber degrades at 30%</b> <span class="dim">— bounded influences still add up when every outlier pushes upward</span></li>
+        <li><b>Next</b> <span class="dim">— Tukey bisquare, least trimmed squares, a real housing dataset, more scenarios</span></li>
+      </ul>
+    </div>
+  </section>
+
+  <section class="slide">
+    <div class="kicker">Lessons learned</div>
+    <h2>The loss function is the model's opinion about errors</h2>
+    <div class="content">
+      <p class="lede" style="font-size:clamp(18px,2.2vw,26px); color: var(--fg); max-width:900px;">Derive before you import. Evaluate on clean data after training on shocked data. Revise the assumption that broke, not the whole model.</p>
+    </div>
+  </section>
+
+  <section class="slide">
+    <div class="kicker">Resources</div>
+    <h2>Paper, code, and live lab</h2>
+    <div class="content">
+      <div class="links">
+        <a href="../index.html#lab">Interactive lab</a>
+        <a class="secondary" href="../index.html">Research portal</a>
+        <a class="secondary" href="https://github.com/clarkngo/scenario-stat-modeling" target="_blank" rel="noopener">Source repo ↗</a>
+      </div>
+      <p class="lede" style="margin-top:36px;">Clark Jason Ngo · DS 623 · City University of Seattle</p>
+    </div>
+  </section>
+
+</div>
+
+<button class="navbtn" id="prevBtn" aria-label="Previous slide">‹</button>
+<button class="navbtn" id="nextBtn" aria-label="Next slide">›</button>
+
+<footer class="chrome">
+  <span id="slideCount"></span>
+  <span class="nav-hint"><kbd>←</kbd><kbd>→</kbd> or click to navigate &nbsp;·&nbsp; <kbd>F</kbd> fullscreen</span>
+</footer>
+<div class="progress-track"><div class="progress-bar" id="progressBar"></div></div>
+
+<script>
+  const slides = document.querySelectorAll('.slide');
+  let i = 0;
+  const total = slides.length;
+  const countEl = document.getElementById('slideCount');
+  const barEl = document.getElementById('progressBar');
+
+  function render() {
+    slides.forEach((s, idx) => s.classList.toggle('active', idx === i));
+    countEl.textContent = (i + 1) + ' / ' + total;
+    barEl.style.width = ((i + 1) / total * 100) + '%';
+  }
+  function go(delta) {
+    i = Math.max(0, Math.min(total - 1, i + delta));
+    render();
+  }
+  document.getElementById('prevBtn').addEventListener('click', () => go(-1));
+  document.getElementById('nextBtn').addEventListener('click', () => go(1));
+  document.addEventListener('keydown', (e) => {
+    if (e.key === 'ArrowRight' || e.key === ' ' || e.key === 'PageDown') { e.preventDefault(); go(1); }
+    if (e.key === 'ArrowLeft' || e.key === 'PageUp') { e.preventDefault(); go(-1); }
+    if (e.key === 'Home') { i = 0; render(); }
+    if (e.key === 'End') { i = total - 1; render(); }
+    if (e.key.toLowerCase() === 'f') {
+      if (!document.fullscreenElement) document.documentElement.requestFullscreen();
+      else document.exitFullscreen();
+    }
+  });
+  document.getElementById('deck').addEventListener('click', (e) => {
+    if (e.target.closest('a') || e.target.closest('.navbtn')) return;
+    const x = e.clientX / window.innerWidth;
+    go(x < 0.5 ? -1 : 1);
+  });
+  render();
+</script>
+
+</body>
+</html>
