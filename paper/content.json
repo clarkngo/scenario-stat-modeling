@@ -1,41 +1,220 @@
 {
-  "title": "Scenario-Driven Statistical Modeling: An AI-Guided Framework for Deriving and Revising Algorithmic Baselines from Scratch",
-  "short_title": "Scenario-Driven Statistical Modeling",
-  "status": "Prototype draft — section text is a working outline; results are from the synthetic prototype experiment.",
-  "author": {
-    "name": "Clark Jason Ngo",
+  "title": "Forecasting Market Risk from Scratch: Revising GARCH into an Asymmetric, Heavy-Tailed Model for Value-at-Risk",
+  "short_title": "Forecasting Market Risk from Scratch",
+  "status": "Draft 1: title, abstract, keywords, and references. The body sections will be written in Draft 2.",
+  "authors": [
+    {
+      "name": "Clark Jason Ngo",
+      "email": "ngoclarkjason@cityuniversity.edu"
+    },
+    {
+      "name": "Manas Teja Katakam",
+      "email": "katakammanasteja1@cityuniversity.edu"
+    }
+  ],
+  "affiliation": {
     "course": "DS 623 Math and Statistics for Data Science",
     "program": "Master of Science in Data Science",
     "school": "School of Technology & Computing",
-    "university": "City University of Seattle",
-    "email": "ngoclarkjason@cityuniversity.edu"
+    "university": "City University of Seattle"
   },
-  "abstract": "Students in mathematics and statistics for data science often meet estimators as finished formulas or library calls, which hides the assumptions that make those estimators work. This paper proposes a scenario-driven framework in which an AI tutor guides learners to derive a baseline model from first principles, implement it in vectorized NumPy without high-level machine-learning libraries, subject it to a realistic scenario shock, diagnose which assumption failed, and derive a revised model in response. We demonstrate the framework with ordinary least squares (OLS) regression on a housing-price scenario. A data-entry shock that records a share of prices ten times too large drives the OLS clean-test RMSE from 40.3 to 573.9 (in $1000s) at 20% contamination, because the squared-error loss gives unbounded influence to large residuals. Replacing the loss with the Huber loss and solving it by iteratively reweighted least squares (IRLS) keeps RMSE at 45.5 under the same shock. A companion GitHub Pages portal renders the derivations, runs both estimators in the browser, and lets learners move the shock themselves. We close with Socratic prompts and lessons for using scenario shocks to teach the link between assumptions and algorithms.",
-  "keywords": "Statistical Modeling, Robust Regression, Huber Loss, Iteratively Reweighted Least Squares, AI-Guided Learning, NumPy",
+  "abstract": "After a calm stretch, it is easy to assume tomorrow will be calm too. Financial markets do not behave that way: quiet periods end suddenly, turbulent days tend to cluster, and large losses happen far more often than a bell curve suggests. Banks and investors summarize this risk with Value-at-Risk, the loss they expect to exceed on only a small share of days. A model that underestimates risk in turbulent periods fails exactly when it matters most. This paper studies how to forecast daily market risk from first principles. We begin with GARCH(1,1), a standard model in which today's risk depends on yesterday's surprise and yesterday's risk. We then revise two of its assumptions: that good and bad news affect risk equally, and that returns follow a normal distribution. Both models, including the maximum-likelihood fitting, will be derived and implemented from scratch in NumPy. We will estimate them on historical daily US stock market returns, forecast risk on a later period the models have not seen, and compare them using standard Value-at-Risk backtests. The goal is to explain, in plain terms, why a volatility model works, where it breaks, and how a targeted revision improves it.",
+  "keywords": "Volatility Forecasting, GARCH, GJR-GARCH, Value-at-Risk, Maximum Likelihood Estimation, Backtesting",
   "sections": [
     {
       "id": "introduction",
       "number": "1",
       "title": "Introduction",
+      "stage": 2,
       "slides": [
-        "Estimators are usually taught as finished formulas or one-line library calls",
-        "The assumptions that make them work stay invisible until real data violate them",
-        "This framework uses a scenario shock to make the violated assumption observable"
+        "A single typo can quietly shift every prediction a model makes",
+        "Learners memorize formulas but rarely see when they fail",
+        "This framework builds an \"aha\" moment around a realistic shock"
       ],
       "blocks": [
-        {"type": "p", "text": "A data scientist who calls a fitting routine inherits every assumption baked into it. In coursework those assumptions are usually listed once and then forgotten, because textbook data rarely violates them. When real data do violate them, the failure is often silent: the routine still returns coefficients, and nothing in the output says they are wrong."},
-        {"type": "p", "text": "This paper treats that gap as a teaching opportunity. We propose a scenario-driven loop in which learners (1) derive a baseline estimator from a loss function, (2) implement it in pure NumPy, (3) confront it with a scenario shock drawn from a realistic data-generating story, (4) trace the failure back to a specific mathematical assumption, and (5) derive a revised estimator that relaxes that assumption. An AI tutor guides each step with Socratic questions rather than answers."},
-        {"type": "p", "text": "Research question: How can AI-guided, scenario-driven exercises help learners derive, stress-test, and revise statistical baselines from first principles, and what measurable improvement does a principled revision deliver?"},
-        {"type": "list", "items": [
-          "A five-stage framework (Derive → Implement → Shock → Diagnose → Revise) for teaching statistical modeling from scratch.",
-          "A worked case: OLS regression revised into Huber M-estimation via IRLS, both in vectorized NumPy.",
-          "An open GitHub Pages portal with in-browser estimators, an adjustable shock, and reproducible Python code."
-        ]}
+        {
+          "type": "p",
+          "text": "Consider a small payroll file for five workers who are each paid $20 an hour. One paycheck for a 30-hour week is typed as $6,000 instead of $600. Fitting the textbook straight line to these five records gives pay = $1,080 + $20 × hours, which predicts $1,280 for a 10-hour shift that actually paid $200. Nothing in the output warns the analyst. One typo out of five has quietly shifted every prediction by more than a thousand dollars."
+        },
+        {
+          "type": "p",
+          "text": "Most learners never see a moment like this. Statistics courses usually present an estimator as a finished formula or a one-line library call, list its assumptions once, and then apply it to clean textbook data that rarely violates them. Learners can compute an answer without understanding why the method works or when it fails, and for non-technical learners the notation itself is often the first barrier. The American Statistical Association's guidelines for introductory statistics call for teaching statistical thinking, focusing on conceptual understanding, and integrating real data with a context and purpose (GAISE College Report ASA Revision Committee [GAISE], 2016)."
+        },
+        {
+          "type": "p",
+          "text": "Research on how people learn points to a better sequence. Understanding tends to deepen when learners wrestle with a problem before they are taught the solution (Sinha & Kapur, 2021), when an idea starts concrete and becomes abstract step by step (Fyfe et al., 2014), and when learners later retrieve what they learned instead of rereading it (Roediger & Karpicke, 2006). Generative AI tutors could deliver this kind of guidance at scale, but recent trials show that they help only when designed to guide rather than to hand over answers (Bastani et al., 2025; Kestin et al., 2025)."
+        },
+        {
+          "type": "p",
+          "text": "This paper proposes Scenario-Driven Statistical Modeling, a framework that turns the moment a model breaks into the center of the lesson. Learners move through five stages (Figure 1). They derive a baseline model from a loss function, implement it from scratch in NumPy (Harris et al., 2020), and predict how it will behave before a realistic shock is applied. They then diagnose which assumption failed and revise only that assumption. An AI tutor supports each stage with hints and questions rather than solutions."
+        },
+        {
+          "type": "figure",
+          "src": "assets/fig_framework.png",
+          "title": "The five stages of scenario-driven statistical modeling",
+          "caption": "The Shock stage is the intended \"aha\" moment: learners commit to a prediction before seeing what the shock does."
+        },
+        {
+          "type": "p",
+          "text": "The scenarios come from everyday money decisions that most adults already understand: a coffee shop's average sale, a fraud alert on a credit card, a payroll file, a rainy-day fund, and a lender's view of borrowers during a recession. Familiar stories lower the barrier for non-technical learners, and money makes the cost of a wrong model concrete."
+        },
+        {
+          "type": "p",
+          "text": "This paper addresses the following research question: How can scenario-driven, AI-guided exercises built on everyday financial situations help learners derive, stress-test, and revise statistical models from first principles, so that the underlying assumptions are understood and remembered rather than memorized?"
+        },
+        {
+          "type": "p",
+          "text": "The paper makes three contributions:"
+        },
+        {
+          "type": "list",
+          "items": [
+            "A five-stage framework (Derive, Implement, Shock, Diagnose, Revise) that grounds each stage in evidence from the learning sciences.",
+            "A worked case that revises ordinary least squares regression into Huber regression in response to a data-entry shock, implemented in vectorized NumPy.",
+            "An open GitHub Pages portal in which learners trigger the shock, watch the repair, and inspect the code (Ngo, 2026)."
+          ]
+        },
+        {
+          "type": "p",
+          "text": "Section 2 reviews related work in statistics education, the learning sciences, robust statistics, and AI tutoring. Sections 3 through 5 present the baseline model, its assumptions, and its behavior under the shock. Sections 6 and 7 present the revised model and compare the two. Sections 8 and 9 discuss the results and the lessons learned."
+        }
+      ]
+    },
+    {
+      "id": "background",
+      "number": "2",
+      "title": "Background and Related Work",
+      "stage": 2,
+      "slides": [
+        "Statistics should be taught with real data and a purpose",
+        "Struggle first, worked examples, concrete-to-abstract, and recall make learning stick",
+        "AI tutors help only when they guide instead of answering"
+      ],
+      "blocks": [
+        {
+          "type": "h3",
+          "text": "Teaching Statistics with Real Data and Purpose"
+        },
+        {
+          "type": "p",
+          "text": "The GAISE College Report sets out six recommendations for introductory statistics: teach statistical thinking, focus on conceptual understanding, integrate real data with a context and purpose, foster active learning, use technology to explore concepts and analyze data, and use assessments to improve and evaluate learning (GAISE, 2016). The 2016 revision moved statistical thinking to the top of the list and added emphasis on statistics as an investigative process of problem solving and decision making. Scenario-driven modeling follows these recommendations directly: each lesson begins with a decision someone actually has to make, uses data with a clear purpose, and asks learners to investigate why a method fails rather than only how to run it."
+        },
+        {
+          "type": "h3",
+          "text": "Problem Solving Before Instruction"
+        },
+        {
+          "type": "p",
+          "text": "Sinha and Kapur (2021) meta-analyzed 53 studies with 166 comparisons of problem solving followed by instruction against instruction followed by problem solving. They found a significant, moderate effect in favor of problem solving first (Hedges' g = 0.36), and stronger effects (g = 0.37 to 0.58) when the design followed the principles of productive failure closely. The benefit reversed for younger learners in grades two to five and for domain-general skills. In this framework, the Shock stage is the problem-first moment: learners predict how the model will react before the explanation is given. Because productive failure depends on adequate prior knowledge, the baseline model is taught first, so learners have something to reason with when it breaks."
+        },
+        {
+          "type": "h3",
+          "text": "Worked Examples"
+        },
+        {
+          "type": "p",
+          "text": "Studying worked examples can reduce the load on working memory for novices. In statistics training specifically, Paas (1992) found that learners who studied worked-out problems or completed partially worked problems transferred their skill better than learners who solved conventional problems. The framework therefore presents the baseline derivation as a complete worked example and presents the revision as a completion problem, in which learners supply the key step themselves."
+        },
+        {
+          "type": "h3",
+          "text": "From Concrete Stories to Abstract Symbols"
+        },
+        {
+          "type": "p",
+          "text": "Concreteness fading begins with a concrete representation and gradually replaces it with more abstract ones. In their systematic review, Fyfe et al. (2014) argue that this sequence helps learners interpret abstract symbols, ground them in familiar experience, and separate essential properties from incidental ones. Each lesson in this framework moves in the same direction: story, then chart, then equation, then code."
+        },
+        {
+          "type": "p",
+          "text": "The format of numbers matters as well. Gigerenzer and Hoffrage (1995) showed that people reason about conditional probabilities far more accurately when information is presented as natural frequencies (for example, 9 out of 10,000) rather than as percentages, and a later meta-analysis confirmed the effect across many studies (McDowell & Jacobs, 2017). The framework's fraud-alert scenario uses this format: out of 10,000 card purchases, 10 are fraud, the alarm catches 9, and it wrongly flags about 100 honest purchases, so only about 9 of 109 flags are real fraud."
+        },
+        {
+          "type": "h3",
+          "text": "Making Learning Stick"
+        },
+        {
+          "type": "p",
+          "text": "Roediger and Karpicke (2006) found that taking a test on studied material improves long-term retention more than restudying it, even when no feedback is given. The framework ends each scenario with short questions that ask learners to explain the idea in their own words, and returns to the same idea in later scenarios so that it is retrieved more than once."
+        },
+        {
+          "type": "h3",
+          "text": "Robust Statistics: When One Number Misleads"
+        },
+        {
+          "type": "p",
+          "text": "The statistical content of the worked case comes from robust statistics. Huber (1964) introduced a loss function that is quadratic for small errors and linear for large ones, which limits how strongly any single observation can pull an estimate. Hampel (1974) formalized this idea with the influence curve, which measures how much one observation changes an estimator; under squared-error loss that influence has no upper bound. Holland and Welsch (1977) showed how such estimators can be computed by iteratively reweighted least squares, the method implemented in this paper. Beaton and Tukey (1974) proposed losses that ignore extreme points entirely, and Rousseeuw (1984) introduced least median of squares regression, which can tolerate contamination of almost half the data."
+        },
+        {
+          "type": "p",
+          "text": "These ideas matter in finance, where data are rarely well behaved. Cont (2001) documented that asset returns have heavy tails and that volatility clusters in time, both of which violate the assumptions behind ordinary least squares. Martin and Simin (2003) showed that a single outlier can change a stock's ordinary least squares beta dramatically, and proposed an outlier-resistant beta based on weighted least squares with data-dependent weights. That estimator is the professional counterpart of the revision learners derive in this paper."
+        },
+        {
+          "type": "h3",
+          "text": "AI Tutors: Guidance Without Giving Away the Answer"
+        },
+        {
+          "type": "p",
+          "text": "Large language models create new opportunities in education, along with risks such as overreliance and inaccurate output (Kasneci et al., 2023). Two recent trials show that tutor design determines which of these dominates. Kestin et al. (2025) compared an AI tutor built on research-based teaching principles with in-class active learning in a Harvard physics course; students learned significantly more in less time with the tutor and reported higher engagement. Bastani et al. (2025) gave nearly a thousand high school mathematics students access to GPT-4. An unrestricted chat interface improved practice grades by 48%, but when access was removed those students scored 17% lower than students who never had it. A tutor designed to give hints instead of answers largely removed that harm. The tutor in this framework follows the second design: it asks questions and gives hints, and it never supplies the final formula."
+        },
+        {
+          "type": "table",
+          "title": "Learning principles and how the framework applies them",
+          "caption": "Each stage of the framework is tied to a finding from the learning sciences or statistics education.",
+          "header": [
+            "Principle",
+            "Evidence",
+            "Use in the framework"
+          ],
+          "rows": [
+            [
+              "Problem solving before instruction",
+              "Sinha & Kapur (2021)",
+              "Learners predict the effect of the shock before the explanation"
+            ],
+            [
+              "Worked examples",
+              "Paas (1992)",
+              "Baseline derivation shown in full; revision completed by the learner"
+            ],
+            [
+              "Concreteness fading",
+              "Fyfe et al. (2014)",
+              "Story, then chart, then equation, then code"
+            ],
+            [
+              "Natural frequencies",
+              "Gigerenzer & Hoffrage (1995)",
+              "Probabilities shown as counts out of 10,000"
+            ],
+            [
+              "Retrieval practice",
+              "Roediger & Karpicke (2006)",
+              "Recall questions after each scenario and in later ones"
+            ],
+            [
+              "Guardrailed AI tutoring",
+              "Bastani et al. (2025); Kestin et al. (2025)",
+              "Tutor gives hints and questions, never the answer"
+            ],
+            [
+              "Real data with a purpose",
+              "GAISE (2016)",
+              "Everyday financial decisions as the context"
+            ]
+          ]
+        },
+        {
+          "type": "h3",
+          "text": "Gap Addressed by This Work"
+        },
+        {
+          "type": "p",
+          "text": "Robust statistics is usually taught to specialists after the classical methods, and the learning-sciences findings above are rarely applied to the derivation of estimators. Few learning resources let a learner derive a model, break it with a realistic shock, and repair it from first principles in one sequence. This paper combines these strands into a single framework, aimed at learners who are new to the mathematics as well as data science students."
+        }
       ]
     },
     {
       "id": "baseline",
-      "number": "2",
+      "number": "3",
       "title": "Problem & Baseline Model",
       "slides": [
         "Predict house price from size and age with a linear model",
@@ -43,23 +222,63 @@
         "Under Gaussian errors, OLS is also the maximum-likelihood estimator"
       ],
       "blocks": [
-        {"type": "h3", "text": "Problem Statement"},
-        {"type": "p", "text": "An analyst must estimate how house price responds to living area and age so that the model can price new listings. Let y ∈ ℝⁿ be prices and X ∈ ℝⁿˣ⁽ᵖ⁺¹⁾ the design matrix with an intercept column. We seek coefficients β that generalize to new, correctly recorded listings."},
-        {"type": "h3", "text": "Original Model Formulation"},
-        {"type": "p", "text": "We assume a linear data-generating process with additive noise:"},
-        {"type": "eq", "latex": "y = X\\beta + \\varepsilon, \\qquad \\varepsilon \\sim \\mathcal{N}(0, \\sigma^2 I_n)", "text": "y = Xβ + ε,   ε ~ N(0, σ²Iₙ)"},
-        {"type": "p", "text": "The squared-error loss and its gradient are"},
-        {"type": "eq", "latex": "\\mathcal{L}(\\beta) = \\frac{1}{2n}\\lVert y - X\\beta \\rVert_2^2, \\qquad \\nabla_\\beta \\mathcal{L} = -\\frac{1}{n} X^\\top (y - X\\beta)", "text": "L(β) = (1/2n)‖y − Xβ‖²,   ∇L = −(1/n) Xᵀ(y − Xβ)"},
-        {"type": "p", "text": "Setting the gradient to zero yields the normal equations and, when XᵀX is invertible, the closed-form estimator:"},
-        {"type": "eq", "latex": "X^\\top X \\hat\\beta = X^\\top y \\;\\Longrightarrow\\; \\hat\\beta_{\\text{OLS}} = (X^\\top X)^{-1} X^\\top y", "text": "XᵀXβ̂ = Xᵀy  ⇒  β̂ = (XᵀX)⁻¹Xᵀy"},
-        {"type": "p", "text": "Because the Hessian XᵀX/n is positive semi-definite, the loss is convex and any stationary point is a global minimum. Under the Gaussian assumption, maximizing the log-likelihood −(n/2)log(2πσ²) − ‖y − Xβ‖²/(2σ²) is equivalent to minimizing the same loss, so OLS is also the maximum-likelihood estimator, and by the Gauss–Markov theorem it is the best linear unbiased estimator."},
-        {"type": "h3", "text": "Description of the Model"},
-        {"type": "p", "text": "The implementation solves the least-squares problem with an SVD-based solver rather than forming (XᵀX)⁻¹ explicitly, which avoids squaring the condition number. A batch gradient-descent variant is included so learners can verify that the iterative and closed-form solutions agree."}
-      ]
+        {
+          "type": "h3",
+          "text": "Problem Statement"
+        },
+        {
+          "type": "p",
+          "text": "An analyst must estimate how house price responds to living area and age so that the model can price new listings. Let y ∈ ℝⁿ be prices and X ∈ ℝⁿˣ⁽ᵖ⁺¹⁾ the design matrix with an intercept column. We seek coefficients β that generalize to new, correctly recorded listings."
+        },
+        {
+          "type": "h3",
+          "text": "Original Model Formulation"
+        },
+        {
+          "type": "p",
+          "text": "We assume a linear data-generating process with additive noise:"
+        },
+        {
+          "type": "eq",
+          "latex": "y = X\\beta + \\varepsilon, \\qquad \\varepsilon \\sim \\mathcal{N}(0, \\sigma^2 I_n)",
+          "text": "y = Xβ + ε,   ε ~ N(0, σ²Iₙ)"
+        },
+        {
+          "type": "p",
+          "text": "The squared-error loss and its gradient are"
+        },
+        {
+          "type": "eq",
+          "latex": "\\mathcal{L}(\\beta) = \\frac{1}{2n}\\lVert y - X\\beta \\rVert_2^2, \\qquad \\nabla_\\beta \\mathcal{L} = -\\frac{1}{n} X^\\top (y - X\\beta)",
+          "text": "L(β) = (1/2n)‖y − Xβ‖²,   ∇L = −(1/n) Xᵀ(y − Xβ)"
+        },
+        {
+          "type": "p",
+          "text": "Setting the gradient to zero yields the normal equations and, when XᵀX is invertible, the closed-form estimator:"
+        },
+        {
+          "type": "eq",
+          "latex": "X^\\top X \\hat\\beta = X^\\top y \\;\\Longrightarrow\\; \\hat\\beta_{\\text{OLS}} = (X^\\top X)^{-1} X^\\top y",
+          "text": "XᵀXβ̂ = Xᵀy  ⇒  β̂ = (XᵀX)⁻¹Xᵀy"
+        },
+        {
+          "type": "p",
+          "text": "Because the Hessian XᵀX/n is positive semi-definite, the loss is convex and any stationary point is a global minimum. Under the Gaussian assumption, maximizing the log-likelihood −(n/2)log(2πσ²) − ‖y − Xβ‖²/(2σ²) is equivalent to minimizing the same loss, so OLS is also the maximum-likelihood estimator, and by the Gauss–Markov theorem it is the best linear unbiased estimator."
+        },
+        {
+          "type": "h3",
+          "text": "Description of the Model"
+        },
+        {
+          "type": "p",
+          "text": "The implementation solves the least-squares problem with an SVD-based solver rather than forming (XᵀX)⁻¹ explicitly, which avoids squaring the condition number. A batch gradient-descent variant is included so learners can verify that the iterative and closed-form solutions agree."
+        }
+      ],
+      "stage": 2
     },
     {
       "id": "assumptions",
-      "number": "3",
+      "number": "4",
       "title": "Assumptions & Applications",
       "slides": [
         "Linearity, independence, homoscedasticity, Gaussian errors, full-rank X",
@@ -67,22 +286,65 @@
         "Scenario: a unit-entry error records some prices ×10"
       ],
       "blocks": [
-        {"type": "h3", "text": "Assumptions of the Model"},
-        {"type": "table", "title": "Assumptions of the OLS baseline", "caption": "Each assumption is paired with the question the AI tutor asks when a shock occurs.", "header": ["Assumption", "Mathematical form", "Socratic check"], "rows": [
-          ["Linearity", "E[y | X] = Xβ", "Does the residual plot show curvature?"],
-          ["Independence", "Cov(εᵢ, εⱼ) = 0", "Were rows collected independently?"],
-          ["Homoscedasticity", "Var(εᵢ) = σ²", "Does residual spread grow with ŷ?"],
-          ["Gaussian, light-tailed errors", "ε ~ N(0, σ²I)", "How many residuals exceed 3σ?"],
-          ["Full column rank", "rank(X) = p + 1", "Is XᵀX well-conditioned?"]
-        ]},
-        {"type": "p", "text": "The Gaussian-error assumption is the one the scenario shock targets. The influence of observation i on the OLS solution grows linearly with its residual, ψ(r) = r, so a single large error can move β̂ arbitrarily far: OLS has a breakdown point of 0."},
-        {"type": "h3", "text": "Real-World Applications & Scenario Definition"},
-        {"type": "p", "text": "Linear baselines price real estate, forecast demand, and calibrate sensors. In each setting, records can be corrupted by data-entry errors, unit mix-ups, or sensor faults. Our scenario: during a listing-system migration, a share of prices is entered in the wrong unit and recorded ten times too large. The model must still learn the true market relationship."}
-      ]
+        {
+          "type": "h3",
+          "text": "Assumptions of the Model"
+        },
+        {
+          "type": "table",
+          "title": "Assumptions of the OLS baseline",
+          "caption": "Each assumption is paired with the question the AI tutor asks when a shock occurs.",
+          "header": [
+            "Assumption",
+            "Mathematical form",
+            "Socratic check"
+          ],
+          "rows": [
+            [
+              "Linearity",
+              "E[y | X] = Xβ",
+              "Does the residual plot show curvature?"
+            ],
+            [
+              "Independence",
+              "Cov(εᵢ, εⱼ) = 0",
+              "Were rows collected independently?"
+            ],
+            [
+              "Homoscedasticity",
+              "Var(εᵢ) = σ²",
+              "Does residual spread grow with ŷ?"
+            ],
+            [
+              "Gaussian, light-tailed errors",
+              "ε ~ N(0, σ²I)",
+              "How many residuals exceed 3σ?"
+            ],
+            [
+              "Full column rank",
+              "rank(X) = p + 1",
+              "Is XᵀX well-conditioned?"
+            ]
+          ]
+        },
+        {
+          "type": "p",
+          "text": "The Gaussian-error assumption is the one the scenario shock targets. The influence of observation i on the OLS solution grows linearly with its residual, ψ(r) = r, so a single large error can move β̂ arbitrarily far: OLS has a breakdown point of 0."
+        },
+        {
+          "type": "h3",
+          "text": "Real-World Applications & Scenario Definition"
+        },
+        {
+          "type": "p",
+          "text": "Linear baselines price real estate, forecast demand, and calibrate sensors. In each setting, records can be corrupted by data-entry errors, unit mix-ups, or sensor faults. Our scenario: during a listing-system migration, a share of prices is entered in the wrong unit and recorded ten times too large. The model must still learn the true market relationship."
+        }
+      ],
+      "stage": 2
     },
     {
       "id": "data",
-      "number": "4",
+      "number": "5",
       "title": "Data & Baseline Results",
       "slides": [
         "Synthetic data with known β so bias is measured exactly",
@@ -90,16 +352,34 @@
         "OLS test RMSE: 40 → 574 at 20% contamination"
       ],
       "blocks": [
-        {"type": "h3", "text": "Description of the Data and Scenario Shock"},
-        {"type": "p", "text": "The prototype uses synthetic data with known ground truth so that estimator bias can be measured exactly; a public housing dataset will be added in the full study. Each replication draws n = 200 training and 1,000 test listings with standardized size and age, true coefficients β = (300, 85, −20) in $1000s, and noise σ = 40. The shock multiplies a fraction c ∈ {0, 5, 10, 20, 30}% of training prices by 10. The test set is never shocked, so test RMSE measures how well each model recovers the real market. Results average 200 replications (seed 623)."},
-        {"type": "h3", "text": "Results of Pure NumPy Execution"},
-        {"type": "figure", "src": "assets/fig_fit.png", "title": "OLS and Huber fits after a 10% scenario shock", "caption": "Hollow circles are shocked rows. OLS is pulled toward them; Huber follows the clean majority."},
-        {"type": "p", "text": "At c = 0 OLS reaches the noise floor (RMSE ≈ σ). With only 5% of rows shocked, its test RMSE nearly quadruples, and the coefficient error grows roughly linearly with c. The model has not merely become noisier; it is biased, because every shocked residual pulls the fit with force proportional to its size."}
-      ]
+        {
+          "type": "h3",
+          "text": "Description of the Data and Scenario Shock"
+        },
+        {
+          "type": "p",
+          "text": "The prototype uses synthetic data with known ground truth so that estimator bias can be measured exactly; a public housing dataset will be added in the full study. Each replication draws n = 200 training and 1,000 test listings with standardized size and age, true coefficients β = (300, 85, −20) in $1000s, and noise σ = 40. The shock multiplies a fraction c ∈ {0, 5, 10, 20, 30}% of training prices by 10. The test set is never shocked, so test RMSE measures how well each model recovers the real market. Results average 200 replications (seed 623)."
+        },
+        {
+          "type": "h3",
+          "text": "Results of Pure NumPy Execution"
+        },
+        {
+          "type": "figure",
+          "src": "assets/fig_fit.png",
+          "title": "OLS and Huber fits after a 10% scenario shock",
+          "caption": "Hollow circles are shocked rows. OLS is pulled toward them; Huber follows the clean majority."
+        },
+        {
+          "type": "p",
+          "text": "At c = 0 OLS reaches the noise floor (RMSE ≈ σ). With only 5% of rows shocked, its test RMSE nearly quadruples, and the coefficient error grows roughly linearly with c. The model has not merely become noisier; it is biased, because every shocked residual pulls the fit with force proportional to its size."
+        }
+      ],
+      "stage": 2
     },
     {
       "id": "revised",
-      "number": "5",
+      "number": "6",
       "title": "Revised Model Formulation",
       "slides": [
         "Replace squared loss with Huber loss: quadratic near 0, linear in the tails",
@@ -107,20 +387,50 @@
         "Solve by IRLS: weighted least squares with wᵢ = min(1, δ/|uᵢ|)"
       ],
       "blocks": [
-        {"type": "h3", "text": "Improved Model Mechanics"},
-        {"type": "p", "text": "The diagnosis points to the loss, not the linear structure. We keep y ≈ Xβ but replace the squared loss with the Huber loss applied to scaled residuals uᵢ = rᵢ / s:"},
-        {"type": "eq", "latex": "\\rho_\\delta(u) = \\begin{cases} \\tfrac{1}{2}u^2 & |u| \\le \\delta \\\\ \\delta |u| - \\tfrac{1}{2}\\delta^2 & |u| > \\delta \\end{cases}, \\qquad \\psi_\\delta(u) = \\rho_\\delta'(u) = \\operatorname{clip}(u, -\\delta, \\delta)", "text": "ρδ(u) = u²/2  for |u| ≤ δ   ρδ(u) = δ|u| − δ²/2  for |u| > δ   ψδ(u) = clip(u, −δ, δ)"},
-        {"type": "h3", "text": "Description of Improvement and Expected Benefit"},
-        {"type": "p", "text": "The estimating equation Σ ψδ(rᵢ/s) xᵢ = 0 has no closed form, but writing ψδ(u) = w(u)·u turns it into a weighted least-squares problem:"},
-        {"type": "eq", "latex": "w_i = \\min\\!\\left(1, \\frac{\\delta}{|u_i|}\\right), \\qquad \\hat\\beta^{(t+1)} = (X^\\top W^{(t)} X)^{-1} X^\\top W^{(t)} y", "text": "wᵢ = min(1, δ/|uᵢ|),   β⁽ᵗ⁺¹⁾ = (XᵀW⁽ᵗ⁾X)⁻¹XᵀW⁽ᵗ⁾y"},
-        {"type": "p", "text": "The scale is re-estimated each iteration with the normalized median absolute deviation, s = 1.4826 · median|rᵢ − median(r)|, which is itself robust. With δ = 1.345 the estimator retains about 95% of OLS efficiency when errors are truly Gaussian, while bounding each observation's influence at δ. Because ρδ is convex, IRLS converges to the global minimum from the OLS warm start. In code, the weighted solve is performed as an ordinary least-squares solve on rows scaled by √wᵢ, which avoids forming XᵀWX."},
-        {"type": "h3", "text": "Target Applications"},
-        {"type": "p", "text": "Huber regression suits any pipeline where a minority of records may be grossly wrong but cannot be identified in advance: migrated listing data, sensor streams with spikes, and financial records with keying errors."}
-      ]
+        {
+          "type": "h3",
+          "text": "Improved Model Mechanics"
+        },
+        {
+          "type": "p",
+          "text": "The diagnosis points to the loss, not the linear structure. We keep y ≈ Xβ but replace the squared loss with the Huber loss applied to scaled residuals uᵢ = rᵢ / s:"
+        },
+        {
+          "type": "eq",
+          "latex": "\\rho_\\delta(u) = \\begin{cases} \\tfrac{1}{2}u^2 & |u| \\le \\delta \\\\ \\delta |u| - \\tfrac{1}{2}\\delta^2 & |u| > \\delta \\end{cases}, \\qquad \\psi_\\delta(u) = \\rho_\\delta'(u) = \\operatorname{clip}(u, -\\delta, \\delta)",
+          "text": "ρδ(u) = u²/2  for |u| ≤ δ   ρδ(u) = δ|u| − δ²/2  for |u| > δ   ψδ(u) = clip(u, −δ, δ)"
+        },
+        {
+          "type": "h3",
+          "text": "Description of Improvement and Expected Benefit"
+        },
+        {
+          "type": "p",
+          "text": "The estimating equation Σ ψδ(rᵢ/s) xᵢ = 0 has no closed form, but writing ψδ(u) = w(u)·u turns it into a weighted least-squares problem:"
+        },
+        {
+          "type": "eq",
+          "latex": "w_i = \\min\\!\\left(1, \\frac{\\delta}{|u_i|}\\right), \\qquad \\hat\\beta^{(t+1)} = (X^\\top W^{(t)} X)^{-1} X^\\top W^{(t)} y",
+          "text": "wᵢ = min(1, δ/|uᵢ|),   β⁽ᵗ⁺¹⁾ = (XᵀW⁽ᵗ⁾X)⁻¹XᵀW⁽ᵗ⁾y"
+        },
+        {
+          "type": "p",
+          "text": "The scale is re-estimated each iteration with the normalized median absolute deviation, s = 1.4826 · median|rᵢ − median(r)|, which is itself robust. With δ = 1.345 the estimator retains about 95% of OLS efficiency when errors are truly Gaussian, while bounding each observation's influence at δ. Because ρδ is convex, IRLS converges to the global minimum from the OLS warm start. In code, the weighted solve is performed as an ordinary least-squares solve on rows scaled by √wᵢ, which avoids forming XᵀWX."
+        },
+        {
+          "type": "h3",
+          "text": "Target Applications"
+        },
+        {
+          "type": "p",
+          "text": "Huber regression suits any pipeline where a minority of records may be grossly wrong but cannot be identified in advance: migrated listing data, sensor streams with spikes, and financial records with keying errors."
+        }
+      ],
+      "stage": 3
     },
     {
       "id": "results",
-      "number": "6",
+      "number": "7",
       "title": "Results & Comparison",
       "slides": [
         "Huber stays near the noise floor through 20% contamination",
@@ -128,23 +438,74 @@
         "Cost: ~10–17 IRLS iterations instead of one solve"
       ],
       "blocks": [
-        {"type": "h3", "text": "Empirical Results"},
-        {"type": "table", "title": "Clean-test RMSE and coefficient error under the scenario shock", "caption": "Mean over 200 replications. RMSE in $1000s; σ = 40 is the irreducible floor.", "source": "results"},
-        {"type": "figure", "src": "assets/fig_sweep.png", "title": "Test RMSE as the shock grows", "caption": "OLS error grows linearly with contamination; Huber stays near the noise floor until the shock reaches 30%."},
-        {"type": "h3", "text": "Comparison Matrix"},
-        {"type": "table", "title": "Original vs. revised model", "caption": "Qualitative and computational comparison.", "header": ["Property", "OLS (original)", "Huber-IRLS (revised)"], "rows": [
-          ["Loss", "½r²", "Huber ρδ(r/s)"],
-          ["Influence function", "Unbounded, ψ(u) = u", "Bounded, |ψ(u)| ≤ δ"],
-          ["Solution", "One least-squares solve", "Iterated weighted solves"],
-          ["Efficiency, Gaussian noise", "100%", "≈ 95% (δ = 1.345)"],
-          ["Robust to vertical outliers", "No (breakdown 0)", "Yes, up to moderate contamination"],
-          ["Robust to leverage points", "No", "No"]
-        ]}
-      ]
+        {
+          "type": "h3",
+          "text": "Empirical Results"
+        },
+        {
+          "type": "table",
+          "title": "Clean-test RMSE and coefficient error under the scenario shock",
+          "caption": "Mean over 200 replications. RMSE in $1000s; σ = 40 is the irreducible floor.",
+          "source": "results"
+        },
+        {
+          "type": "figure",
+          "src": "assets/fig_sweep.png",
+          "title": "Test RMSE as the shock grows",
+          "caption": "OLS error grows linearly with contamination; Huber stays near the noise floor until the shock reaches 30%."
+        },
+        {
+          "type": "h3",
+          "text": "Comparison Matrix"
+        },
+        {
+          "type": "table",
+          "title": "Original vs. revised model",
+          "caption": "Qualitative and computational comparison.",
+          "header": [
+            "Property",
+            "OLS (original)",
+            "Huber-IRLS (revised)"
+          ],
+          "rows": [
+            [
+              "Loss",
+              "½r²",
+              "Huber ρδ(r/s)"
+            ],
+            [
+              "Influence function",
+              "Unbounded, ψ(u) = u",
+              "Bounded, |ψ(u)| ≤ δ"
+            ],
+            [
+              "Solution",
+              "One least-squares solve",
+              "Iterated weighted solves"
+            ],
+            [
+              "Efficiency, Gaussian noise",
+              "100%",
+              "≈ 95% (δ = 1.345)"
+            ],
+            [
+              "Robust to vertical outliers",
+              "No (breakdown 0)",
+              "Yes, up to moderate contamination"
+            ],
+            [
+              "Robust to leverage points",
+              "No",
+              "No"
+            ]
+          ]
+        }
+      ],
+      "stage": 3
     },
     {
       "id": "discussion",
-      "number": "7",
+      "number": "8",
       "title": "Discussion & Future Work",
       "slides": [
         "The shock exposed an assumption, not a bug",
@@ -152,22 +513,38 @@
         "Next: redescending losses, leverage-robust estimators, real data"
       ],
       "blocks": [
-        {"type": "h3", "text": "Discussion of Results"},
-        {"type": "p", "text": "The shock did not reveal a coding error; both implementations are correct. It revealed that OLS answers a different question (the conditional mean under light tails) than the scenario asked. The revision succeeded because it targeted the violated assumption precisely: the linear structure was kept and only the loss changed."},
-        {"type": "p", "text": "Huber's degradation at 30% is itself instructive. Each shocked row's influence is bounded, but all shocked rows push upward, so their bounded contributions accumulate into bias. Learners can predict this from ψδ before running the experiment."},
-        {"type": "h3", "text": "Strategic Future Improvements"},
-        {"type": "list", "items": [
-          "Redescending M-estimators (Tukey bisquare) whose weights fall to zero for gross outliers.",
-          "High-breakdown estimators such as least trimmed squares for leverage points.",
-          "A real public housing dataset with an injected, documented shock.",
-          "Additional scenarios: heteroscedasticity → weighted least squares; class imbalance → weighted logistic regression.",
-          "A study of learner outcomes with and without the AI-guided Socratic prompts."
-        ]}
-      ]
+        {
+          "type": "h3",
+          "text": "Discussion of Results"
+        },
+        {
+          "type": "p",
+          "text": "The shock did not reveal a coding error; both implementations are correct. It revealed that OLS answers a different question (the conditional mean under light tails) than the scenario asked. The revision succeeded because it targeted the violated assumption precisely: the linear structure was kept and only the loss changed."
+        },
+        {
+          "type": "p",
+          "text": "Huber's degradation at 30% is itself instructive. Each shocked row's influence is bounded, but all shocked rows push upward, so their bounded contributions accumulate into bias. Learners can predict this from ψδ before running the experiment."
+        },
+        {
+          "type": "h3",
+          "text": "Strategic Future Improvements"
+        },
+        {
+          "type": "list",
+          "items": [
+            "Redescending M-estimators (Tukey bisquare) whose weights fall to zero for gross outliers.",
+            "High-breakdown estimators such as least trimmed squares for leverage points.",
+            "A real public housing dataset with an injected, documented shock.",
+            "Additional scenarios: heteroscedasticity → weighted least squares; class imbalance → weighted logistic regression.",
+            "A study of learner outcomes with and without the AI-guided Socratic prompts."
+          ]
+        }
+      ],
+      "stage": 3
     },
     {
       "id": "lessons",
-      "number": "8",
+      "number": "9",
       "title": "Lessons Learned",
       "slides": [
         "Derive before you import: the loss function is the model's opinion about errors",
@@ -175,28 +552,86 @@
         "Revise the assumption that broke, not the whole model"
       ],
       "blocks": [
-        {"type": "list", "items": [
-          "The loss function encodes an assumption about errors; choosing a loss is a statistical decision, not a coding detail.",
-          "A model can fit its training data well while learning the wrong relationship; separating a clean evaluation set from shocked training data makes that visible.",
-          "A targeted revision outperforms a wholesale model change: Huber kept the interpretability of linear regression.",
-          "Numerical choices matter: SVD-based solves and √w row-scaling avoid the conditioning problems of explicit inverses."
-        ]}
-      ]
+        {
+          "type": "list",
+          "items": [
+            "The loss function encodes an assumption about errors; choosing a loss is a statistical decision, not a coding detail.",
+            "A model can fit its training data well while learning the wrong relationship; separating a clean evaluation set from shocked training data makes that visible.",
+            "A targeted revision outperforms a wholesale model change: Huber kept the interpretability of linear regression.",
+            "Numerical choices matter: SVD-based solves and √w row-scaling avoid the conditioning problems of explicit inverses."
+          ]
+        }
+      ],
+      "stage": 3
     }
   ],
   "references": [
-    "Beaton, A. E., & Tukey, J. W. (1974). The fitting of power series, meaning polynomials, illustrated on band-spectroscopic data. Technometrics, 16(2), 147–185. https://doi.org/10.1080/00401706.1974.10489171",
-    "Hampel, F. R. (1974). The influence curve and its role in robust estimation. Journal of the American Statistical Association, 69(346), 383–393. https://doi.org/10.1080/01621459.1974.10482962",
-    "Harris, C. R., Millman, K. J., van der Walt, S. J., et al. (2020). Array programming with NumPy. Nature, 585, 357–362. https://doi.org/10.1038/s41586-020-2649-2",
-    "Holland, P. W., & Welsch, R. E. (1977). Robust regression using iteratively reweighted least-squares. Communications in Statistics – Theory and Methods, 6(9), 813–827. https://doi.org/10.1080/03610927708827533",
-    "Huber, P. J. (1964). Robust estimation of a location parameter. The Annals of Mathematical Statistics, 35(1), 73–101. https://doi.org/10.1214/aoms/1177703732",
-    "Kasneci, E., Sessler, K., Küchemann, S., et al. (2023). ChatGPT for good? On opportunities and challenges of large language models for education. Learning and Individual Differences, 103, 102274. https://doi.org/10.1016/j.lindif.2023.102274",
-    "Rousseeuw, P. J. (1984). Least median of squares regression. Journal of the American Statistical Association, 79(388), 871–880. https://doi.org/10.1080/01621459.1984.10477105",
-    "Ngo, C. J. (2026). Scenario-driven statistical modeling [Interactive web application and source code]. GitHub. https://github.com/clarkngo/scenario-stat-modeling"
+    {
+      "stage": 1,
+      "text": "Bollerslev, T. (1986). Generalized autoregressive conditional heteroskedasticity. *Journal of Econometrics, 31*(3), 307–327. https://doi.org/10.1016/0304-4076(86)90063-1"
+    },
+    {
+      "stage": 2,
+      "text": "Bollerslev, T. (1987). A conditionally heteroskedastic time series model for speculative prices and rates of return. *The Review of Economics and Statistics, 69*(3), 542–547. https://doi.org/10.2307/1925546"
+    },
+    {
+      "stage": 1,
+      "text": "Christoffersen, P. F. (1998). Evaluating interval forecasts. *International Economic Review, 39*(4), 841–862. https://doi.org/10.2307/2527341"
+    },
+    {
+      "stage": 2,
+      "text": "Cont, R. (2001). Empirical properties of asset returns: Stylized facts and statistical issues. *Quantitative Finance, 1*(2), 223–236. https://doi.org/10.1080/713665670"
+    },
+    {
+      "stage": 1,
+      "text": "Engle, R. F. (1982). Autoregressive conditional heteroscedasticity with estimates of the variance of United Kingdom inflation. *Econometrica, 50*(4), 987–1007. https://doi.org/10.2307/1912773"
+    },
+    {
+      "stage": 1,
+      "text": "French, K. R. (2026). *Data library* [Data set]. Tuck School of Business, Dartmouth College. https://mba.tuck.dartmouth.edu/pages/faculty/ken.french/data_library.html"
+    },
+    {
+      "stage": 1,
+      "text": "Glosten, L. R., Jagannathan, R., & Runkle, D. E. (1993). On the relation between the expected value and the volatility of the nominal excess return on stocks. *The Journal of Finance, 48*(5), 1779–1801. https://doi.org/10.1111/j.1540-6261.1993.tb05128.x"
+    },
+    {
+      "stage": 1,
+      "text": "Hansen, P. R., & Lunde, A. (2005). A forecast comparison of volatility models: Does anything beat a GARCH(1,1)? *Journal of Applied Econometrics, 20*(7), 873–889. https://doi.org/10.1002/jae.800"
+    },
+    {
+      "stage": 2,
+      "text": "Harris, C. R., Millman, K. J., van der Walt, S. J., Gommers, R., Virtanen, P., Cournapeau, D., Wieser, E., Taylor, J., Berg, S., Smith, N. J., Kern, R., Picus, M., Hoyer, S., van Kerkwijk, M. H., Brett, M., Haldane, A., del Río, J. F., Wiebe, M., Peterson, P., … Oliphant, T. E. (2020). Array programming with NumPy. *Nature, 585*(7825), 357–362. https://doi.org/10.1038/s41586-020-2649-2"
+    },
+    {
+      "stage": 1,
+      "text": "Kupiec, P. H. (1995). Techniques for verifying the accuracy of risk measurement models. *The Journal of Derivatives, 3*(2), 73–84. https://doi.org/10.3905/jod.1995.407942"
+    },
+    {
+      "stage": 2,
+      "text": "Nelder, J. A., & Mead, R. (1965). A simplex method for function minimization. *The Computer Journal, 7*(4), 308–313. https://doi.org/10.1093/comjnl/7.4.308"
+    }
   ],
   "appendix": [
-    {"title": "Appendix A. Original Model (Python + NumPy)", "code": "model/baseline.py"},
-    {"title": "Appendix B. Revised Model (Python + NumPy)", "code": "model/revised.py"},
-    {"title": "Appendix C. Repository and Deployment Blueprint", "text": "The repository contains the NumPy models (model/), the experiment runner (model/run_experiment.py), the GitHub Pages portal (index.html, style.css, script.js), the slide deck (presentations/), and local builders for the Word and PowerPoint versions (tools/). Every push to main deploys the static site through GitHub Actions. To reproduce all results and documents locally, run: python3 model/run_experiment.py && python3 tools/make_figures.py && python3 tools/build_docx.py && python3 tools/build_pptx.py"}
-  ]
+    {
+      "title": "Appendix A. Original Model (Python + NumPy)",
+      "code": "model/baseline.py"
+    },
+    {
+      "title": "Appendix B. Revised Model (Python + NumPy)",
+      "code": "model/revised.py"
+    },
+    {
+      "title": "Appendix C. Repository and Deployment Blueprint",
+      "text": "The repository contains the NumPy models (model/), the experiment runner (model/run_experiment.py), the GitHub Pages portal (index.html, style.css, script.js), the slide deck (presentations/), and local builders for the Word and PowerPoint versions (tools/). Every push to main deploys the static site through GitHub Actions. To reproduce all results and documents locally, run: python3 model/run_experiment.py && python3 tools/make_figures.py && python3 tools/build_docx.py && python3 tools/build_pptx.py"
+    }
+  ],
+  "draft": {
+    "stage": 1,
+    "labels": {
+      "1": "Draft 1",
+      "2": "Draft 2",
+      "3": "Final Paper"
+    },
+    "note": "Draft 1 = title, abstract, keywords, references. Draft 2 adds the body sections marked stage 2. Final adds stage 3 and the code appendices."
+  }
 }

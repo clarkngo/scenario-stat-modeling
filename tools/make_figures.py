@@ -1,7 +1,7 @@
 """Render paper figures from results/results.json (matplotlib is used for plotting only).
 
 Usage:  python3 tools/make_figures.py
-Writes: assets/fig_sweep.png, assets/fig_fit.png
+Writes: assets/fig_framework.png, assets/fig_sweep.png, assets/fig_fit.png
 """
 import json
 import os
@@ -11,6 +11,7 @@ import numpy as np
 import matplotlib
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt  # noqa: E402
+from matplotlib.patches import FancyBboxPatch  # noqa: E402
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, os.path.join(ROOT, "model"))
@@ -22,6 +23,40 @@ OLS_C, HUB_C, INK, MUTED, GRID = "#2a78d6", "#eb6834", "#0b0b0b", "#52514e", "#e
 plt.rcParams.update({"font.family": "DejaVu Sans", "font.size": 9, "axes.edgecolor": MUTED,
                      "axes.labelcolor": INK, "xtick.color": MUTED, "ytick.color": MUTED,
                      "axes.spines.top": False, "axes.spines.right": False})
+
+
+STAGES = [
+    ("1  Derive", "Build the rule from a loss function"),
+    ("2  Implement", "Code it from scratch in NumPy"),
+    ("3  Shock", "Predict first, then a realistic data problem hits"),
+    ("4  Diagnose", "Find the assumption that broke"),
+    ("5  Revise", "Change only that assumption and compare"),
+]
+
+
+def fig_framework():
+    """Vertical five-stage flow; the Shock stage is outlined in the accent color."""
+    fig, ax = plt.subplots(figsize=(3.4, 4.4), dpi=220)
+    ax.set_xlim(0, 10)
+    ax.set_ylim(0, 10.6)
+    ax.axis("off")
+    h, gap, top = 1.45, 0.62, 10.3
+    for i, (name, desc) in enumerate(STAGES):
+        y = top - i * (h + gap) - h
+        shock = name.endswith("Shock")
+        ax.add_patch(FancyBboxPatch((0.3, y), 9.4, h, boxstyle="round,pad=0.02,rounding_size=0.25",
+                                    fc="#fdf1ec" if shock else "#f3f3f0",
+                                    ec=HUB_C if shock else MUTED, lw=1.4 if shock else 0.8))
+        ax.text(0.75, y + h * 0.66, name, fontsize=8.5, fontweight="bold", color=INK, va="center")
+        ax.text(0.75, y + h * 0.28, desc, fontsize=7, color=MUTED, va="center")
+        if i < len(STAGES) - 1:
+            ax.annotate("", xy=(5, y - gap + 0.04), xytext=(5, y - 0.04),
+                        arrowprops=dict(arrowstyle="-|>", color=MUTED, lw=0.9))
+    ax.text(5, 0.05, "AI tutor at every stage: hints and questions, never the answer",
+            fontsize=6.6, color=MUTED, ha="center", style="italic")
+    fig.tight_layout(pad=0.2)
+    fig.savefig(os.path.join(ROOT, "assets", "fig_framework.png"))
+    plt.close(fig)
 
 
 def fig_sweep(rows):
@@ -74,6 +109,7 @@ if __name__ == "__main__":
     with open(os.path.join(ROOT, "results", "results.json")) as f:
         rows = json.load(f)["rows"]
     os.makedirs(os.path.join(ROOT, "assets"), exist_ok=True)
+    fig_framework()
     fig_sweep(rows)
     fig_fit()
-    print("wrote assets/fig_sweep.png, assets/fig_fit.png")
+    print("wrote assets/fig_framework.png, assets/fig_sweep.png, assets/fig_fit.png")

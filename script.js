@@ -83,10 +83,11 @@
   }
 
   function renderPaper(paper, results) {
-    const a = paper.author;
+    const a = paper.affiliation;
+    const names = paper.authors.map((x) => x.name).join(" & ");
     $("#course").textContent = a.course;
     $("#paperTitle").textContent = paper.title;
-    $("#byline").textContent = `${a.name} · ${a.program} · ${a.school}, ${a.university}`;
+    $("#byline").textContent = `${names} · ${a.program} · ${a.school}, ${a.university}`;
     $("#status").textContent = paper.status;
     $("#abstractText").textContent = paper.abstract;
     $("#keywords").textContent = paper.keywords;
@@ -101,7 +102,12 @@
     const refs = el("section", { id: "references", class: "paper-section" });
     refs.append(el("h2", {}, `${paper.sections.length + 1}. References`));
     const ol = el("ul", { class: "refs" });
-    [...paper.references].sort().forEach((r) => ol.append(el("li", {}, r)));
+    // References mark italic spans (APA titles) with *asterisks*.
+    paper.references.map((r) => r.text).sort((x, y) => x.toLowerCase().localeCompare(y.toLowerCase())).forEach((r) => {
+      const li = el("li");
+      r.split("*").forEach((chunk, k) => li.append(k % 2 ? el("i", {}, chunk) : document.createTextNode(chunk)));
+      ol.append(li);
+    });
     refs.append(ol);
     body.append(refs);
 
