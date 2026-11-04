@@ -1,11 +1,11 @@
 # scenario-stat-modeling
 
-**Scenario-Driven Statistical Modeling: An AI-Guided Framework for Deriving and Revising Algorithmic Baselines from Scratch**
+**Forecasting Market Risk from Scratch: Revising GARCH into an Asymmetric, Heavy-Tailed Model for Value-at-Risk**
 Clark Jason Ngo & Manas Teja Katakam · DS 623 Math and Statistics for Data Science · City University of Seattle
 
-> **Status: working prototype.** The pipeline, web portal, slides, and document builders work end to end. The section text is a first draft, and the experiment uses synthetic data with known ground truth.
+> **Status:** Draft 1 submitted. The portal, slides and paper body show working drafts built from our prototype results on real data.
 
-The framework has five stages: **Derive → Implement → Shock → Diagnose → Revise.** The worked case derives OLS regression, shocks it with a unit-entry data error (×10 prices), traces the failure to the squared-error loss, and revises the model into Huber regression solved by IRLS. Both models use pure NumPy, with no scikit-learn, PyTorch, or SciPy fitting.
+We derive GARCH(1,1) from first principles, implement it and its maximum-likelihood fitting in NumPy, test it as a daily Value-at-Risk model on real US market returns, and revise the two assumptions that fail (equal reaction to good and bad news, and normal shocks) into GJR-GARCH with Student-t errors. The portal's lab replays the 2020 crash and other periods in the browser.
 
 - Portal: https://clarkngo.github.io/scenario-stat-modeling/
 - Slides: https://clarkngo.github.io/scenario-stat-modeling/presentations/ds623-scenario-stat-modeling.html
@@ -49,12 +49,9 @@ make data     # re-download the latest French data
 
 | Path | What it is |
 |---|---|
-| `model/baseline.py` | OLS (closed form + gradient descent), NumPy only |
-| `model/revised.py` | Huber M-estimator via IRLS, NumPy only |
-| `model/scenario.py` | Data generator and scenario shock |
-| `model/run_experiment.py` | Monte Carlo sweep → `results/results.json`, `results/results.md` |
+| `model/baseline.py`, `model/revised.py`, `model/scenario.py`, `model/run_experiment.py` | Earlier OLS → Huber prototype on synthetic data (kept for reference; not used by the portal) |
 | `paper/content.json` | **Single source of paper text**, used by the portal, DOCX, and PPTX |
-| `index.html`, `style.css`, `script.js` | GitHub Pages portal: MathJax paper, in-browser lab, code tabs |
+| `index.html`, `style.css`, `script.js` | GitHub Pages portal: MathJax paper, in-browser Value-at-Risk lab on the real data, code tabs |
 | `presentations/ds623-scenario-stat-modeling.html` | HTML slide deck (←/→, F for fullscreen) |
 | `tools/build_docx.py` | Word paper in the course-paper format (2-column body, APA tables/figures), built per draft stage |
 | `tools/build_pptx.py` | PowerPoint deck |

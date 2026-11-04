@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1" />
-<title>Scenario-Driven Statistical Modeling</title>
+<title>Forecasting Market Risk from Scratch · DS 623</title>
 <style>
   :root {
     --bg: #0f1115;
@@ -92,20 +92,19 @@
     gap: 14px;
   }
   ul.points li {
-    display: flex;
-    gap: 14px;
-    align-items: baseline;
+    position: relative;
+    padding-left: 20px;
     font-size: clamp(14px, 1.4vw, 18px);
     line-height: 1.5;
     color: var(--fg);
   }
   ul.points li::before {
     content: "";
-    flex: none;
+    position: absolute;
+    left: 0; top: 0.6em;
     width: 6px; height: 6px;
     border-radius: 50%;
     background: var(--accent);
-    margin-top: 8px;
   }
   ul.points li b { color: var(--fg); }
   ul.points li span.dim { color: var(--fg-dim); }
@@ -303,135 +302,197 @@
 
   <section class="slide active">
     <div class="kicker">DS 623 — Math and Statistics for Data Science</div>
-    <h1>Scenario-Driven Statistical Modeling</h1>
-    <p class="subtitle">An AI-guided framework for deriving and revising algorithmic baselines from scratch</p>
+    <h1>Forecasting Market Risk from Scratch</h1>
+    <p class="subtitle">Revising GARCH into an asymmetric, heavy-tailed model for Value-at-Risk</p>
     <div class="byline"><strong>Clark Jason Ngo &amp; Manas Teja Katakam</strong> — MS in Data Science, City University of Seattle</div>
   </section>
 
   <section class="slide">
     <div class="kicker">Problem</div>
-    <h2>A fitting routine never tells you which assumption it broke</h2>
+    <h2>A calm year makes tomorrow look calm</h2>
     <div class="content">
-      <p class="lede">Learners meet estimators as finished formulas or one-line library calls. When real data violate an assumption, the routine still returns coefficients — silently wrong ones.</p>
+      <p class="lede">At the start of February 2020, the US market had just had a quiet year (13% annualized volatility vs. an 18% long-run average). A risk limit based on the past year allowed for a worst day of about −1.8%.</p>
       <ul class="points">
-        <li><b>Hidden assumptions</b> <span class="dim">— listed once in a textbook, then forgotten</span></li>
-        <li><b>Silent failure</b> <span class="dim">— a model can fit training data while learning the wrong relationship</span></li>
-        <li><b>Research question</b> <span class="dim">— can AI-guided scenario shocks help learners derive, stress-test, and revise baselines from first principles?</span></li>
+        <li><b>Next three months</b> <span class="dim">— 13 days with losses worse than −3%; −12.0% on March 16</span></li>
+        <li><b>Value-at-Risk (VaR)</b> <span class="dim">— a daily loss limit that should be broken on only 1 day in 100 (or 5 in 100)</span></li>
+        <li><b>Research question</b> <span class="dim">— can a volatility model built from first principles, then revised where real data proves it wrong, give better limits?</span></li>
       </ul>
     </div>
   </section>
 
   <section class="slide">
-    <div class="kicker">Framework</div>
-    <h2>Five stages, guided by Socratic questions</h2>
+    <div class="kicker">Background · Cont (2001)</div>
+    <h2>Direction is unpredictable. Size is not.</h2>
+    <div class="content">
+      <div class="grid cols-3">
+        <div class="card"><div class="label">Volatility clustering</div><div class="body">Rough days come in bunches. Lag-1 autocorrelation: returns <b>−0.03</b>, squared returns <b>0.21</b> (train) and <b>0.44</b> (test).</div></div>
+        <div class="card"><div class="label">Heavy tails</div><div class="body">Kurtosis <b>11.3</b> (train), <b>16.7</b> (test); a bell curve has 3. Days beyond 4σ: <b>0.60%</b> vs 0.006% under a normal.</div></div>
+        <div class="card"><div class="label">Asymmetry</div><div class="body">A drop makes markets more nervous than a rise of the same size: the <b>leverage effect</b> (Glosten et al., 1993).</div></div>
+      </div>
+      <p class="lede" style="margin-top:24px">Data: Kenneth R. French Data Library, daily US market return, 1990-01-02 to 2026-08-31 (9,233 trading days).</p>
+    </div>
+  </section>
+
+  <section class="slide">
+    <div class="kicker">Approach</div>
+    <h2>Derive, test on a crisis, revise what broke</h2>
     <div class="content">
       <div class="flow">
-        <div class="step">Derive</div><div class="arrow">→</div>
-        <div class="step">Implement</div><div class="arrow">→</div>
-        <div class="step shock">Shock</div><div class="arrow">→</div>
-        <div class="step">Diagnose</div><div class="arrow">→</div>
-        <div class="step">Revise</div>
+        <div class="step">Derive GARCH</div><div class="arrow">→</div>
+        <div class="step">Implement in NumPy</div><div class="arrow">→</div>
+        <div class="step shock">Test on a crisis</div><div class="arrow">→</div>
+        <div class="step">Diagnose assumptions</div><div class="arrow">→</div>
+        <div class="step">Revise to GJR-GARCH-t</div>
       </div>
       <div class="grid cols-3" style="margin-top:28px">
-        <div class="card"><div class="label">Constraint</div><div class="body">Pure <b>NumPy</b>. No scikit-learn, PyTorch, or SciPy fitting.</div></div>
-        <div class="card"><div class="label">AI tutor role</div><div class="body">Asks <b>which assumption</b> failed; never hands over the fix.</div></div>
-        <div class="card"><div class="label">Evaluation</div><div class="body">Train on <b>shocked</b> data, test on <b>clean</b> data.</div></div>
+        <div class="card"><div class="label">Constraint</div><div class="body">Pure <b>NumPy</b>: likelihoods, optimizer, quantiles and backtests written by hand. No SciPy.</div></div>
+        <div class="card"><div class="label">Split</div><div class="body">Fit on <b>1990–2014</b> (6,301 days). Test on <b>2015–Aug 2026</b> (2,932 days), never seen.</div></div>
+        <div class="card"><div class="label">Judged by</div><div class="body"><b>1% and 5% VaR backtests</b> (Kupiec, Christoffersen) and out-of-sample log score.</div></div>
       </div>
     </div>
   </section>
 
   <section class="slide">
-    <div class="kicker">Baseline · Section 2</div>
-    <h2>Ordinary least squares, derived</h2>
+    <div class="kicker">Original model · Bollerslev (1986)</div>
+    <h2>GARCH(1,1): tomorrow's risk from today's surprise</h2>
     <div class="content">
-      <div class="eqn">\[ \mathcal{L}(\beta) = \tfrac{1}{2n}\lVert y - X\beta\rVert_2^2 \qquad \nabla_\beta\mathcal{L} = -\tfrac{1}{n}X^\top(y - X\beta) = 0 \]</div>
-      <div class="eqn">\[ \hat\beta_{\text{OLS}} = (X^\top X)^{-1}X^\top y \]</div>
+      <div class="eqn">\[ r_t = \mu + \sigma_t z_t,\quad z_t \sim N(0,1) \qquad \sigma_t^2 = \omega + \alpha\, e_{t-1}^2 + \beta\, \sigma_{t-1}^2 \]</div>
       <ul class="points">
-        <li><b>Convex</b> <span class="dim">— Hessian XᵀX/n is PSD, so the stationary point is global</span></li>
-        <li><b>MLE under Gaussian noise</b> <span class="dim">— and BLUE by Gauss–Markov</span></li>
-        <li><b>Influence ψ(r) = r</b> <span class="dim">— unbounded: breakdown point 0</span></li>
+        <li><b>ω baseline, α reaction, β memory</b> <span class="dim">— β here is not CAPM beta</span></li>
+        <li><b>Persistence α + β</b> <span class="dim">— fitted 0.990: half of a shock fades in ≈ 67 trading days</span></li>
+        <li><b>Fitted values</b> <span class="dim">— ω = 0.0123, α = 0.084, β = 0.906; long-run volatility 1.10% a day</span></li>
       </ul>
     </div>
   </section>
 
   <section class="slide">
-    <div class="kicker">Scenario shock · Sections 3–4</div>
-    <h2>A unit-entry error records prices ×10</h2>
+    <div class="kicker">Estimation</div>
+    <h2>Maximum likelihood, with our own optimizer</h2>
+    <div class="content">
+      <div class="eqn">\[ -\ell = \tfrac12 \sum_t \Big[\ln 2\pi + \ln\sigma_t^2 + \frac{e_t^2}{\sigma_t^2}\Big] \]</div>
+      <div class="eqn">\[ \omega = e^{z_0}, \qquad [\alpha,\ \tfrac{\gamma}{2},\ \beta] = \frac{e^{z_{1:3}}}{1 + \sum e^{z_{1:3}}}, \qquad \nu = 2 + e^{z_4} \]</div>
+      <ul class="points">
+        <li><b>Why likelihood</b> <span class="dim">— volatility is never observed, so least squares has nothing to fit</span></li>
+        <li><b>Nelder–Mead (1965)</b> <span class="dim">— derivative-free simplex search, ~30 lines of NumPy, with restarts</span></li>
+        <li><b>Reparameterization</b> <span class="dim">— every trial point is automatically valid; recovers known parameters on 8,000 simulated days</span></li>
+      </ul>
+    </div>
+  </section>
+
+  <section class="slide">
+    <div class="kicker">Test on a crisis</div>
+    <h2>The original model is surprised too often</h2>
     <div class="content two">
       <div>
-        <p class="lede">During a listing-system migration, a share of training prices is entered ten times too large. The test set stays clean.</p>
         <ul class="points">
-          <li><b>Targets</b> <span class="dim">— the light-tailed Gaussian error assumption</span></li>
-          <li><b>Data</b> <span class="dim">— synthetic, known β = (300, 85, −20), σ = 40</span></li>
-          <li><b>Protocol</b> <span class="dim">— 200 replications per shock level</span></li>
+          <li><b>60 breaches</b> <span class="dim">of the 1% limit in 2,932 test days, about twice the 29 expected</span></li>
+          <li><b>6 breaches</b> <span class="dim">in Feb–Apr 2020 (past-year rule: 12)</span></li>
+          <li><b>The past-year rule</b> <span class="dim">is the most cautious on average, yet breaks the most: its caution arrives at the wrong time</span></li>
         </ul>
       </div>
-      <div class="figure-card"><img src="../assets/fig_fit.png" alt="OLS line pulled toward shocked rows; Huber line follows clean data"></div>
+      <div class="figure-card"><img src="../assets/fig_garch_covid.png" alt="Daily returns in 2020 with 1% VaR limits from three models; breach markers"></div>
     </div>
   </section>
 
   <section class="slide">
-    <div class="kicker">Revision · Section 5</div>
-    <h2>Keep the line, change the loss</h2>
+    <div class="kicker">Diagnose</div>
+    <h2>Which assumption broke?</h2>
     <div class="content">
-      <div class="eqn">\[ \rho_\delta(u)=\begin{cases}\tfrac12u^2 & |u|\le\delta\\ \delta|u|-\tfrac12\delta^2 & |u|>\delta\end{cases} \qquad \psi_\delta(u)=\operatorname{clip}(u,-\delta,\delta) \]</div>
-      <div class="eqn">\[ w_i=\min\!\left(1,\tfrac{\delta}{|u_i|}\right) \qquad \hat\beta^{(t+1)}=(X^\top W X)^{-1}X^\top W y \]</div>
+      <table class="deck-table">
+        <tr><th>Assumption</th><th>Evidence (1990–2014)</th><th>Verdict</th></tr>
+        <tr><td><b>Volatility depends on the past</b></td><td>Squared-return autocorrelation 0.21</td><td><span class="pill pass">Holds</span></td></tr>
+        <tr><td><b>Stationary volatility</b></td><td>Persistence 0.990 &lt; 1</td><td><span class="pill pass">Holds</span></td></tr>
+        <tr><td><b>Constant mean</b></td><td>Mean 0.04% vs volatility 1.13% a day</td><td><span class="pill pass">Reasonable</span></td></tr>
+        <tr><td><b>Good and bad news act alike</b></td><td>Once allowed, the reaction to good news is ≈ 0</td><td><span class="pill fail">Fails</span></td></tr>
+        <tr><td><b>Normal shocks</b></td><td>Kurtosis 11.3; 4σ days 95× too common</td><td><span class="pill fail">Fails</span></td></tr>
+        <tr><td><b>Stable parameters</b></td><td>Frozen at 2014 for the whole test</td><td><span class="pill hitl">Untested</span></td></tr>
+      </table>
+    </div>
+  </section>
+
+  <section class="slide">
+    <div class="kicker">Revised model · Glosten et al. (1993), Bollerslev (1987)</div>
+    <h2>Relax exactly the two assumptions that failed</h2>
+    <div class="content">
+      <div class="eqn">\[ \sigma_t^2 = \omega + \big(\alpha + \gamma\, \mathbb{1}[e_{t-1} &lt; 0]\big)\, e_{t-1}^2 + \beta\, \sigma_{t-1}^2, \qquad z_t \sim t_\nu \sqrt{\tfrac{\nu-2}{\nu}} \]</div>
       <ul class="points">
-        <li><b>Bounded influence</b> <span class="dim">— no single row can move β̂ more than δ allows</span></li>
-        <li><b>δ = 1.345</b> <span class="dim">— ≈95% of OLS efficiency when errors really are Gaussian</span></li>
-        <li><b>IRLS</b> <span class="dim">— solve a weighted LS on √w-scaled rows until β̂ stops moving</span></li>
+        <li><b>γ: bad news counts more</b> <span class="dim">— extra reaction only after a negative surprise; persistence α + γ/2 + β</span></li>
+        <li><b>Student-t shocks</b> <span class="dim">— one extra parameter ν gives crash days realistic weight</span></li>
+        <li><b>Strict extension</b> <span class="dim">— γ = 0 and ν → ∞ gives the original back; we fit all four combinations</span></li>
       </ul>
     </div>
   </section>
 
   <section class="slide">
-    <div class="kicker">Results · Section 6</div>
-    <h2>Huber holds the noise floor through 20% contamination</h2>
+    <div class="kicker">Finding</div>
+    <h2>Fear is louder than greed</h2>
     <div class="content two">
-      <table class="deck-table">
-        <tr><th>Shock</th><th class="num">OLS RMSE</th><th class="num">Huber RMSE</th></tr>
-        <tr><td><b>0%</b></td><td class="num">40.3</td><td class="num">40.3</td></tr>
-        <tr><td><b>5%</b></td><td class="num">157.2</td><td class="num">40.5</td></tr>
-        <tr><td><b>10%</b></td><td class="num">297.3</td><td class="num">41.3</td></tr>
-        <tr><td><b>20%</b></td><td class="num">573.9</td><td class="num">45.5</td></tr>
-        <tr><td><b>30%</b></td><td class="num">852.6</td><td class="num">62.0</td></tr>
-      </table>
-      <div class="figure-card"><img src="../assets/fig_sweep.png" alt="Test RMSE versus contamination for OLS and Huber"></div>
+      <div>
+        <ul class="points">
+          <li><b>α = 0.001, γ = 0.141</b> <span class="dim">— good surprises barely move tomorrow's risk</span></li>
+          <li><b>After a −3% day</b> <span class="dim">— revised model: 1.51% volatility; original: 1.36%</span></li>
+          <li><b>After a +3% day</b> <span class="dim">— revised model: 1.00%; original: still 1.36%</span></li>
+          <li><b>ν ≈ 8</b> <span class="dim">— 1% quantile −2.51 instead of −2.33</span></li>
+        </ul>
+      </div>
+      <div class="figure-card"><img src="../assets/fig_garch_news.png" alt="News impact curves: symmetric for GARCH, lopsided for GJR-GARCH"></div>
     </div>
   </section>
 
   <section class="slide">
-    <div class="kicker">Comparison</div>
-    <h2>Original vs. revised</h2>
+    <div class="kicker">Results · 1% Value-at-Risk, 2015–Aug 2026</div>
+    <h2>Fewer surprises, especially in the crash</h2>
     <div class="content">
       <table class="deck-table">
-        <tr><th>Property</th><th>OLS</th><th>Huber-IRLS</th></tr>
-        <tr><td><b>Influence</b></td><td>Unbounded</td><td>Bounded by δ</td></tr>
-        <tr><td><b>Solve</b></td><td>One least-squares solve</td><td>~10–17 weighted solves</td></tr>
-        <tr><td><b>Gaussian efficiency</b></td><td>100%</td><td>≈95%</td></tr>
-        <tr><td><b>Vertical outliers</b></td><td><span class="pill fail">Breaks</span></td><td><span class="pill pass">Robust</span></td></tr>
-        <tr><td><b>Leverage points</b></td><td><span class="pill fail">Breaks</span></td><td><span class="pill hitl">Not addressed</span></td></tr>
+        <tr><th>Model</th><th class="num">Breaches (≈29 expected)</th><th class="num">Rate</th><th class="num">Feb–Apr 2020</th><th class="num">Kupiec p</th></tr>
+        <tr><td>Past-year rule (rolling 250 days)</td><td class="num">76</td><td class="num">2.59%</td><td class="num">12</td><td class="num">&lt; 0.001</td></tr>
+        <tr><td>EWMA (RiskMetrics, λ = 0.94)</td><td class="num">67</td><td class="num">2.29%</td><td class="num">6</td><td class="num">&lt; 0.001</td></tr>
+        <tr><td><b>GARCH, normal (original)</b></td><td class="num"><b>60</b></td><td class="num">2.05%</td><td class="num"><b>6</b></td><td class="num">&lt; 0.001</td></tr>
+        <tr><td>GARCH, Student-t</td><td class="num">56</td><td class="num">1.91%</td><td class="num">6</td><td class="num">&lt; 0.001</td></tr>
+        <tr><td>GJR-GARCH, normal</td><td class="num">58</td><td class="num">1.98%</td><td class="num">5</td><td class="num">&lt; 0.001</td></tr>
+        <tr><td><b>GJR-GARCH, Student-t (revised)</b></td><td class="num"><b>51</b></td><td class="num">1.74%</td><td class="num"><b>2</b></td><td class="num">&lt; 0.001</td></tr>
       </table>
+      <p class="lede" style="margin-top:18px">Every model still breaks the 1% limit too often, and all fail the test. The revised model comes closest.</p>
+    </div>
+  </section>
+
+  <section class="slide">
+    <div class="kicker">Results · 5% VaR and overall fit</div>
+    <h2>Both GARCH models pass at 5%; the revised model fits best</h2>
+    <div class="content">
+      <table class="deck-table">
+        <tr><th>Model</th><th class="num">5% breaches (≈147)</th><th>Kupiec</th><th>Christoffersen</th><th class="num">−log L per day</th></tr>
+        <tr><td>Past-year rule</td><td class="num">161</td><td><span class="pill pass">Pass</span></td><td><span class="pill fail">Fail</span></td><td class="num">1.516</td></tr>
+        <tr><td>EWMA</td><td class="num">180</td><td><span class="pill fail">Fail</span></td><td><span class="pill fail">Fail</span></td><td class="num">1.360</td></tr>
+        <tr><td><b>GARCH, normal (original)</b></td><td class="num">163</td><td><span class="pill pass">Pass</span></td><td><span class="pill pass">Pass</span></td><td class="num">1.337</td></tr>
+        <tr><td><b>GJR-GARCH-t (revised)</b></td><td class="num">154</td><td><span class="pill pass">Pass</span></td><td><span class="pill pass">Pass</span></td><td class="num"><b>1.287</b></td></tr>
+      </table>
+      <ul class="points">
+        <li><b>Christoffersen</b> <span class="dim">— the past-year rule gets the count right, but its breaches clump together</span></li>
+        <li><b>Training fit</b> <span class="dim">— AIC 16,799 → 16,411; each revision helps on its own</span></li>
+      </ul>
     </div>
   </section>
 
   <section class="slide">
     <div class="kicker">Discussion</div>
-    <h2>The shock exposed an assumption, not a bug</h2>
+    <h2>The revision narrows the gap; it doesn't close it</h2>
     <div class="content">
       <ul class="points">
-        <li><b>Targeted revision</b> <span class="dim">— linear structure kept; only the loss changed</span></li>
-        <li><b>Why Huber degrades at 30%</b> <span class="dim">— bounded influences still add up when every outlier pushes upward</span></li>
-        <li><b>Next</b> <span class="dim">— Tukey bisquare, least trimmed squares, a real housing dataset, more scenarios</span></li>
+        <li><b>Frozen parameters</b> <span class="dim">— estimated once on data ending in 2014</span></li>
+        <li><b>A wilder test period</b> <span class="dim">— kurtosis 16.7 vs 11.3 in training</span></li>
+        <li><b>Tails still too thin</b> <span class="dim">— the fitted t allows 0.17% of 4σ days; 0.6% occurred</span></li>
+        <li><b>Skew</b> <span class="dim">— returns lean negative (−0.40); the t is symmetric</span></li>
+        <li><b>Next</b> <span class="dim">— rolling re-estimation, skewed-t, Expected Shortfall, a significance test of the log-score gain, 12 industry portfolios</span></li>
       </ul>
     </div>
   </section>
 
   <section class="slide">
     <div class="kicker">Lessons learned</div>
-    <h2>The loss function is the model's opinion about errors</h2>
+    <h2>Revise the assumption that broke, then measure the fix</h2>
     <div class="content">
-      <p class="lede" style="font-size:clamp(18px,2.2vw,26px); color: var(--fg); max-width:900px;">Derive before you import. Evaluate on clean data after training on shocked data. Revise the assumption that broke, not the whole model.</p>
+      <p class="lede" style="font-size:clamp(18px,2.2vw,26px); color: var(--fg); max-width:900px;">Look at the data before choosing a model. When the thing you care about is never observed, use likelihood. Judge forecasts on data the model hasn't seen, and report the failures too.</p>
     </div>
   </section>
 
@@ -440,7 +501,7 @@
     <h2>Paper, code, and live lab</h2>
     <div class="content">
       <div class="links">
-        <a href="../index.html#lab">Interactive lab</a>
+        <a href="../index.html#lab">Replay a crisis (lab)</a>
         <a class="secondary" href="../index.html">Research portal</a>
         <a class="secondary" href="https://github.com/clarkngo/scenario-stat-modeling" target="_blank" rel="noopener">Source repo ↗</a>
       </div>
