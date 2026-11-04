@@ -1,7 +1,7 @@
 {
   "title": "Forecasting Market Risk from Scratch: Revising GARCH into an Asymmetric, Heavy-Tailed Model for Value-at-Risk",
   "short_title": "Forecasting Market Risk from Scratch",
-  "status": "Draft 1: title, abstract, keywords, and references. The body sections will be written in Draft 2.",
+  "status": "Draft 1 submitted (title, abstract, keywords, references). The sections below are working drafts from our prototype and will be revised for Draft 2 and the final paper.",
   "authors": [
     {
       "name": "Clark Jason Ngo",
@@ -27,40 +27,32 @@
       "title": "Introduction",
       "stage": 2,
       "slides": [
-        "A single typo can quietly shift every prediction a model makes",
-        "Learners memorize formulas but rarely see when they fail",
-        "This framework builds an \"aha\" moment around a realistic shock"
+        "After a calm year, the past year's volatility makes tomorrow look calm too",
+        "Risk managers set daily loss limits (Value-at-Risk) from forecasts of volatility",
+        "We derive GARCH from scratch, find where it breaks on real data, and revise it"
       ],
       "blocks": [
         {
           "type": "p",
-          "text": "Consider a small payroll file for five workers who are each paid $20 an hour. One paycheck for a 30-hour week is typed as $6,000 instead of $600. Fitting the textbook straight line to these five records gives pay = $1,080 + $20 × hours, which predicts $1,280 for a 10-hour shift that actually paid $200. Nothing in the output warns the analyst. One typo out of five has quietly shifted every prediction by more than a thousand dollars."
+          "text": "At the start of February 2020, the US stock market was coming off a calm year: in 2019 its daily returns had an annualized volatility of about 13%, well below the long-run average of 18%. A risk manager who judged tomorrow by the past year would have set a 1% daily loss limit of about 1.8%. Over the next three months the market fell by more than 3% on 13 separate days, and on March 16 it fell 12%."
         },
         {
           "type": "p",
-          "text": "Most learners never see a moment like this. Statistics courses usually present an estimator as a finished formula or a one-line library call, list its assumptions once, and then apply it to clean textbook data that rarely violates them. Learners can compute an answer without understanding why the method works or when it fails, and for non-technical learners the notation itself is often the first barrier. The American Statistical Association's guidelines for introductory statistics call for teaching statistical thinking, focusing on conceptual understanding, and integrating real data with a context and purpose (GAISE College Report ASA Revision Committee [GAISE], 2016)."
-        },
-        {
-          "type": "p",
-          "text": "Research on how people learn points to a better sequence. Understanding tends to deepen when learners wrestle with a problem before they are taught the solution (Sinha & Kapur, 2021), when an idea starts concrete and becomes abstract step by step (Fyfe et al., 2014), and when learners later retrieve what they learned instead of rereading it (Roediger & Karpicke, 2006). Generative AI tutors could deliver this kind of guidance at scale, but recent trials show that they help only when designed to guide rather than to hand over answers (Bastani et al., 2025; Kestin et al., 2025)."
-        },
-        {
-          "type": "p",
-          "text": "This paper proposes Scenario-Driven Statistical Modeling, a framework that turns the moment a model breaks into the center of the lesson. Learners move through five stages (Figure 1). They derive a baseline model from a loss function, implement it from scratch in NumPy (Harris et al., 2020), and predict how it will behave before a realistic shock is applied. They then diagnose which assumption failed and revise only that assumption. An AI tutor supports each stage with hints and questions rather than solutions."
+          "text": "This is a familiar pattern in financial markets. Quiet stretches end suddenly, turbulent days cluster together, and very large losses happen far more often than a bell curve predicts. Banks, asset managers and regulators summarize this risk with Value-at-Risk (VaR): a loss threshold that should be exceeded on only a small, known share of days. A VaR model that underestimates risk in turbulent periods fails exactly when it matters most."
         },
         {
           "type": "figure",
-          "src": "assets/fig_framework.png",
-          "title": "The five stages of scenario-driven statistical modeling",
-          "caption": "The Shock stage is the intended \"aha\" moment: learners commit to a prediction before seeing what the shock does."
+          "src": "assets/fig_garch_covid.png",
+          "title": "Daily US market returns and 1% Value-at-Risk limits, October 2019 to December 2020",
+          "caption": "Gray bars are daily returns. Lines are the 1% VaR limits from a naive past-year rule (gray), the original GARCH model (blue) and the revised GJR-GARCH-t model (orange). Triangles mark days whose loss broke a limit."
         },
         {
           "type": "p",
-          "text": "The scenarios come from everyday money decisions that most adults already understand: a coffee shop's average sale, a fraud alert on a credit card, a payroll file, a rainy-day fund, and a lender's view of borrowers during a recession. Familiar stories lower the barrier for non-technical learners, and money makes the cost of a wrong model concrete."
+          "text": "This paper studies how to forecast daily market risk from first principles. We start from GARCH(1,1) (Bollerslev, 1986), which lets tomorrow's volatility depend on today's surprise and today's volatility. We derive its likelihood and implement the full fitting procedure, including the optimizer, in NumPy (Harris et al., 2020). We then examine where its assumptions conflict with real data and revise exactly those assumptions, producing an asymmetric, heavy-tailed GJR-GARCH model (Glosten et al., 1993) with Student-t errors (Bollerslev, 1987)."
         },
         {
           "type": "p",
-          "text": "This paper addresses the following research question: How can scenario-driven, AI-guided exercises built on everyday financial situations help learners derive, stress-test, and revise statistical models from first principles, so that the underlying assumptions are understood and remembered rather than memorized?"
+          "text": "Both models are fitted on daily US market returns from 1990 to 2014 and evaluated on 2015 to August 2026, a period they never saw. We judge them with standard VaR backtests (Kupiec, 1995; Christoffersen, 1998) and with out-of-sample log-likelihood, against two simple benchmarks."
         },
         {
           "type": "p",
@@ -69,14 +61,14 @@
         {
           "type": "list",
           "items": [
-            "A five-stage framework (Derive, Implement, Shock, Diagnose, Revise) that grounds each stage in evidence from the learning sciences.",
-            "A worked case that revises ordinary least squares regression into Huber regression in response to a data-entry shock, implemented in vectorized NumPy.",
-            "An open GitHub Pages portal in which learners trigger the shock, watch the repair, and inspect the code (Ngo, 2026)."
+            "A complete, transparent from-scratch implementation of GARCH estimation and VaR backtesting using only NumPy.",
+            "A controlled comparison of the original and revised models that isolates the effect of each revision on real data, including the 2020 COVID crash.",
+            "A plain-language account of why each revision helps, aimed at learners meeting volatility models for the first time."
           ]
         },
         {
           "type": "p",
-          "text": "Section 2 reviews related work in statistics education, the learning sciences, robust statistics, and AI tutoring. Sections 3 through 5 present the baseline model, its assumptions, and its behavior under the shock. Sections 6 and 7 present the revised model and compare the two. Sections 8 and 9 discuss the results and the lessons learned."
+          "text": "Section 2 reviews related work. Section 3 states the problem and derives the baseline model. Section 4 lists its assumptions. Section 5 describes the data and baseline results. Section 6 derives the revised model, Section 7 compares the models, and Sections 8 and 9 discuss limitations and lessons learned."
         }
       ]
     },
@@ -86,129 +78,106 @@
       "title": "Background and Related Work",
       "stage": 2,
       "slides": [
-        "Statistics should be taught with real data and a purpose",
-        "Struggle first, worked examples, concrete-to-abstract, and recall make learning stick",
-        "AI tutors help only when they guide instead of answering"
+        "Returns: direction unpredictable, size predictable (Cont, 2001)",
+        "ARCH (Engle, 1982) → GARCH (Bollerslev, 1986) → GJR asymmetry (Glosten et al., 1993)",
+        "VaR backtests: right number of breaches (Kupiec) and no clustering (Christoffersen)"
       ],
       "blocks": [
         {
           "type": "h3",
-          "text": "Teaching Statistics with Real Data and Purpose"
+          "text": "What Stock Returns Look Like"
         },
         {
           "type": "p",
-          "text": "The GAISE College Report sets out six recommendations for introductory statistics: teach statistical thinking, focus on conceptual understanding, integrate real data with a context and purpose, foster active learning, use technology to explore concepts and analyze data, and use assessments to improve and evaluate learning (GAISE, 2016). The 2016 revision moved statistical thinking to the top of the list and added emphasis on statistics as an investigative process of problem solving and decision making. Scenario-driven modeling follows these recommendations directly: each lesson begins with a decision someone actually has to make, uses data with a clear purpose, and asks learners to investigate why a method fails rather than only how to run it."
+          "text": "Cont (2001) summarizes patterns that appear in almost every financial market. Daily returns are nearly uncorrelated from one day to the next, so their direction is hard to predict. Their size is not: large moves cluster together (volatility clustering), extreme moves are much more common than under a normal distribution (heavy tails), and falling markets tend to become more volatile than rising ones (asymmetry, often called the leverage effect). Any useful risk model has to respect these facts."
         },
         {
           "type": "h3",
-          "text": "Problem Solving Before Instruction"
+          "text": "ARCH and GARCH"
         },
         {
           "type": "p",
-          "text": "Sinha and Kapur (2021) meta-analyzed 53 studies with 166 comparisons of problem solving followed by instruction against instruction followed by problem solving. They found a significant, moderate effect in favor of problem solving first (Hedges' g = 0.36), and stronger effects (g = 0.37 to 0.58) when the design followed the principles of productive failure closely. The benefit reversed for younger learners in grades two to five and for domain-general skills. In this framework, the Shock stage is the problem-first moment: learners predict how the model will react before the explanation is given. Because productive failure depends on adequate prior knowledge, the baseline model is taught first, so learners have something to reason with when it breaks."
+          "text": "Engle (1982) introduced the ARCH model, in which the variance of today's return depends on recent squared surprises. Bollerslev (1986) generalized it to GARCH by adding yesterday's variance to the equation, so a single extra term captures the slow fading of volatility that ARCH needs many lags to describe. GARCH(1,1) remains the standard starting point for volatility forecasting."
         },
         {
           "type": "h3",
-          "text": "Worked Examples"
+          "text": "Asymmetry and Heavy Tails"
         },
         {
           "type": "p",
-          "text": "Studying worked examples can reduce the load on working memory for novices. In statistics training specifically, Paas (1992) found that learners who studied worked-out problems or completed partially worked problems transferred their skill better than learners who solved conventional problems. The framework therefore presents the baseline derivation as a complete worked example and presents the revision as a completion problem, in which learners supply the key step themselves."
+          "text": "Glosten, Jagannathan and Runkle (1993) added a term that raises volatility more after negative returns than after positive ones, and found the effect clearly in US stock returns. Bollerslev (1987) replaced the normal distribution of GARCH shocks with a Student-t distribution, which gives extreme days realistic weight with one extra parameter."
         },
         {
           "type": "h3",
-          "text": "From Concrete Stories to Abstract Symbols"
+          "text": "Value-at-Risk and Backtesting"
         },
         {
           "type": "p",
-          "text": "Concreteness fading begins with a concrete representation and gradually replaces it with more abstract ones. In their systematic review, Fyfe et al. (2014) argue that this sequence helps learners interpret abstract symbols, ground them in familiar experience, and separate essential properties from incidental ones. Each lesson in this framework moves in the same direction: story, then chart, then equation, then code."
-        },
-        {
-          "type": "p",
-          "text": "The format of numbers matters as well. Gigerenzer and Hoffrage (1995) showed that people reason about conditional probabilities far more accurately when information is presented as natural frequencies (for example, 9 out of 10,000) rather than as percentages, and a later meta-analysis confirmed the effect across many studies (McDowell & Jacobs, 2017). The framework's fraud-alert scenario uses this format: out of 10,000 card purchases, 10 are fraud, the alarm catches 9, and it wrongly flags about 100 honest purchases, so only about 9 of 109 flags are real fraud."
+          "text": "A VaR forecast can be checked against what happened. Kupiec (1995) tests whether the share of days on which losses exceeded VaR matches the target. Christoffersen (1998) adds a test of whether those breaches arrive independently, since breaches that bunch together mean the model is slow to react when risk rises."
         },
         {
           "type": "h3",
-          "text": "Making Learning Stick"
+          "text": "Does Anything Beat GARCH(1,1)?"
         },
         {
           "type": "p",
-          "text": "Roediger and Karpicke (2006) found that taking a test on studied material improves long-term retention more than restudying it, even when no feedback is given. The framework ends each scenario with short questions that ask learners to explain the idea in their own words, and returns to the same idea in later scenarios so that it is retrieved more than once."
-        },
-        {
-          "type": "h3",
-          "text": "Robust Statistics: When One Number Misleads"
-        },
-        {
-          "type": "p",
-          "text": "The statistical content of the worked case comes from robust statistics. Huber (1964) introduced a loss function that is quadratic for small errors and linear for large ones, which limits how strongly any single observation can pull an estimate. Hampel (1974) formalized this idea with the influence curve, which measures how much one observation changes an estimator; under squared-error loss that influence has no upper bound. Holland and Welsch (1977) showed how such estimators can be computed by iteratively reweighted least squares, the method implemented in this paper. Beaton and Tukey (1974) proposed losses that ignore extreme points entirely, and Rousseeuw (1984) introduced least median of squares regression, which can tolerate contamination of almost half the data."
-        },
-        {
-          "type": "p",
-          "text": "These ideas matter in finance, where data are rarely well behaved. Cont (2001) documented that asset returns have heavy tails and that volatility clusters in time, both of which violate the assumptions behind ordinary least squares. Martin and Simin (2003) showed that a single outlier can change a stock's ordinary least squares beta dramatically, and proposed an outlier-resistant beta based on weighted least squares with data-dependent weights. That estimator is the professional counterpart of the revision learners derive in this paper."
-        },
-        {
-          "type": "h3",
-          "text": "AI Tutors: Guidance Without Giving Away the Answer"
-        },
-        {
-          "type": "p",
-          "text": "Large language models create new opportunities in education, along with risks such as overreliance and inaccurate output (Kasneci et al., 2023). Two recent trials show that tutor design determines which of these dominates. Kestin et al. (2025) compared an AI tutor built on research-based teaching principles with in-class active learning in a Harvard physics course; students learned significantly more in less time with the tutor and reported higher engagement. Bastani et al. (2025) gave nearly a thousand high school mathematics students access to GPT-4. An unrestricted chat interface improved practice grades by 48%, but when access was removed those students scored 17% lower than students who never had it. A tutor designed to give hints instead of answers largely removed that harm. The tutor in this framework follows the second design: it asks questions and gives hints, and it never supplies the final formula."
+          "text": "Hansen and Lunde (2005) compared 330 volatility models. For exchange rates they found no evidence that GARCH(1,1) was beaten, but for stock returns it was clearly inferior to models that allow a leverage effect. That finding motivates the specific revision we test."
         },
         {
           "type": "table",
-          "title": "Learning principles and how the framework applies them",
-          "caption": "Each stage of the framework is tied to a finding from the learning sciences or statistics education.",
+          "title": "Volatility models compared in this paper",
+          "caption": "All four GARCH variants are fitted by maximum likelihood; the two benchmarks have no fitted parameters.",
           "header": [
-            "Principle",
-            "Evidence",
-            "Use in the framework"
+            "Model",
+            "Learns from data",
+            "Bad news counts more",
+            "Heavy tails",
+            "Fitted parameters"
           ],
           "rows": [
             [
-              "Problem solving before instruction",
-              "Sinha & Kapur (2021)",
-              "Learners predict the effect of the shock before the explanation"
+              "Rolling 250-day volatility",
+              "No",
+              "No",
+              "No",
+              "0"
             ],
             [
-              "Worked examples",
-              "Paas (1992)",
-              "Baseline derivation shown in full; revision completed by the learner"
+              "EWMA (RiskMetrics, λ = 0.94)",
+              "No",
+              "No",
+              "No",
+              "0"
             ],
             [
-              "Concreteness fading",
-              "Fyfe et al. (2014)",
-              "Story, then chart, then equation, then code"
+              "GARCH(1,1), normal (original)",
+              "Yes",
+              "No",
+              "No",
+              "4"
             ],
             [
-              "Natural frequencies",
-              "Gigerenzer & Hoffrage (1995)",
-              "Probabilities shown as counts out of 10,000"
+              "GARCH(1,1), Student-t",
+              "Yes",
+              "No",
+              "Yes",
+              "5"
             ],
             [
-              "Retrieval practice",
-              "Roediger & Karpicke (2006)",
-              "Recall questions after each scenario and in later ones"
+              "GJR-GARCH(1,1), normal",
+              "Yes",
+              "Yes",
+              "No",
+              "5"
             ],
             [
-              "Guardrailed AI tutoring",
-              "Bastani et al. (2025); Kestin et al. (2025)",
-              "Tutor gives hints and questions, never the answer"
-            ],
-            [
-              "Real data with a purpose",
-              "GAISE (2016)",
-              "Everyday financial decisions as the context"
+              "GJR-GARCH(1,1), Student-t (revised)",
+              "Yes",
+              "Yes",
+              "Yes",
+              "6"
             ]
           ]
-        },
-        {
-          "type": "h3",
-          "text": "Gap Addressed by This Work"
-        },
-        {
-          "type": "p",
-          "text": "Robust statistics is usually taught to specialists after the classical methods, and the learning-sciences findings above are rarely applied to the derivation of estimators. Few learning resources let a learner derive a model, break it with a realistic shock, and repair it from first principles in one sequence. This paper combines these strands into a single framework, aimed at learners who are new to the mathematics as well as data science students."
         }
       ]
     },
@@ -216,10 +185,11 @@
       "id": "baseline",
       "number": "3",
       "title": "Problem & Baseline Model",
+      "stage": 2,
       "slides": [
-        "Predict house price from size and age with a linear model",
-        "Minimize mean squared error → normal equations XᵀXβ = Xᵀy",
-        "Under Gaussian errors, OLS is also the maximum-likelihood estimator"
+        "Forecast tomorrow's volatility σₜ using only data up to today",
+        "GARCH(1,1): σ²ₜ = ω + α e²ₜ₋₁ + β σ²ₜ₋₁",
+        "Fitted by maximum likelihood with our own Nelder–Mead optimizer"
       ],
       "blocks": [
         {
@@ -228,341 +198,663 @@
         },
         {
           "type": "p",
-          "text": "An analyst must estimate how house price responds to living area and age so that the model can price new listings. Let y ∈ ℝⁿ be prices and X ∈ ℝⁿˣ⁽ᵖ⁺¹⁾ the design matrix with an intercept column. We seek coefficients β that generalize to new, correctly recorded listings."
+          "text": "Each trading day, we want a forecast of how large tomorrow's market move is likely to be, using only information available today, and we want to turn that forecast into a 1% and a 5% daily Value-at-Risk."
         },
         {
           "type": "h3",
-          "text": "Original Model Formulation"
+          "text": "Return Model"
         },
         {
           "type": "p",
-          "text": "We assume a linear data-generating process with additive noise:"
+          "text": "We write the daily return in percent as an average plus a surprise, and the surprise as volatility times a standard shock with mean 0 and variance 1:"
         },
         {
           "type": "eq",
-          "latex": "y = X\\beta + \\varepsilon, \\qquad \\varepsilon \\sim \\mathcal{N}(0, \\sigma^2 I_n)",
-          "text": "y = Xβ + ε,   ε ~ N(0, σ²Iₙ)"
-        },
-        {
-          "type": "p",
-          "text": "The squared-error loss and its gradient are"
-        },
-        {
-          "type": "eq",
-          "latex": "\\mathcal{L}(\\beta) = \\frac{1}{2n}\\lVert y - X\\beta \\rVert_2^2, \\qquad \\nabla_\\beta \\mathcal{L} = -\\frac{1}{n} X^\\top (y - X\\beta)",
-          "text": "L(β) = (1/2n)‖y − Xβ‖²,   ∇L = −(1/n) Xᵀ(y − Xβ)"
-        },
-        {
-          "type": "p",
-          "text": "Setting the gradient to zero yields the normal equations and, when XᵀX is invertible, the closed-form estimator:"
-        },
-        {
-          "type": "eq",
-          "latex": "X^\\top X \\hat\\beta = X^\\top y \\;\\Longrightarrow\\; \\hat\\beta_{\\text{OLS}} = (X^\\top X)^{-1} X^\\top y",
-          "text": "XᵀXβ̂ = Xᵀy  ⇒  β̂ = (XᵀX)⁻¹Xᵀy"
-        },
-        {
-          "type": "p",
-          "text": "Because the Hessian XᵀX/n is positive semi-definite, the loss is convex and any stationary point is a global minimum. Under the Gaussian assumption, maximizing the log-likelihood −(n/2)log(2πσ²) − ‖y − Xβ‖²/(2σ²) is equivalent to minimizing the same loss, so OLS is also the maximum-likelihood estimator, and by the Gauss–Markov theorem it is the best linear unbiased estimator."
+          "latex": "r_t = \\mu + e_t, \\qquad e_t = \\sigma_t z_t, \\qquad z_t \\overset{iid}{\\sim} N(0, 1)",
+          "text": "rₜ = μ + eₜ,   eₜ = σₜ zₜ,   zₜ ~ iid N(0, 1)"
         },
         {
           "type": "h3",
-          "text": "Description of the Model"
+          "text": "GARCH(1,1)"
         },
         {
           "type": "p",
-          "text": "The implementation solves the least-squares problem with an SVD-based solver rather than forming (XᵀX)⁻¹ explicitly, which avoids squaring the condition number. A batch gradient-descent variant is included so learners can verify that the iterative and closed-form solutions agree."
+          "text": "Tomorrow's variance is a small baseline ω, plus a reaction α to today's squared surprise, plus a share β of today's variance:"
+        },
+        {
+          "type": "eq",
+          "latex": "\\sigma_t^2 = \\omega + \\alpha e_{t-1}^2 + \\beta \\sigma_{t-1}^2",
+          "text": "σ²ₜ = ω + α e²ₜ₋₁ + β σ²ₜ₋₁"
+        },
+        {
+          "type": "p",
+          "text": "The sum α + β, called persistence, controls how slowly a shock to volatility fades. When it is below 1, volatility drifts back to a long-run level, and half of any shock is gone after h days:"
+        },
+        {
+          "type": "eq",
+          "latex": "\\bar\\sigma^2 = \\frac{\\omega}{1 - \\alpha - \\beta}, \\qquad h = \\frac{\\ln 0.5}{\\ln(\\alpha + \\beta)}",
+          "text": "σ̄² = ω / (1 − α − β),   h = ln 0.5 / ln(α + β)"
+        },
+        {
+          "type": "h3",
+          "text": "Maximum Likelihood"
+        },
+        {
+          "type": "p",
+          "text": "Volatility is never observed, so the model cannot be fitted by least squares. Instead we choose the parameters that make the observed returns most probable. With normal shocks, the negative log-likelihood is"
+        },
+        {
+          "type": "eq",
+          "latex": "-\\ell(\\omega, \\alpha, \\beta) = \\tfrac{1}{2} \\sum_{t=1}^{T} \\left[ \\ln 2\\pi + \\ln \\sigma_t^2 + \\frac{e_t^2}{\\sigma_t^2} \\right]",
+          "text": "−ℓ(ω, α, β) = ½ Σₜ [ln 2π + ln σ²ₜ + e²ₜ / σ²ₜ]"
+        },
+        {
+          "type": "h3",
+          "text": "Fitting From Scratch"
+        },
+        {
+          "type": "p",
+          "text": "We minimize the negative log-likelihood with our own implementation of the Nelder–Mead simplex method (Nelder & Mead, 1965), which needs no derivatives. To keep every trial point valid, the optimizer searches over unrestricted numbers z that are mapped to parameters satisfying the constraints ω > 0, α, β ≥ 0 and α + β < 1:"
+        },
+        {
+          "type": "eq",
+          "latex": "\\omega = e^{z_0}, \\qquad [\\alpha, \\beta] = \\frac{[e^{z_1}, e^{z_2}]}{1 + e^{z_1} + e^{z_2}}",
+          "text": "ω = exp(z₀),   [α, β] = [exp(z₁), exp(z₂)] / (1 + exp(z₁) + exp(z₂))"
+        },
+        {
+          "type": "p",
+          "text": "The search is restarted from its best point with a smaller simplex until the likelihood stops improving. A test on 8,000 simulated days confirms that the procedure recovers known parameters."
         }
-      ],
-      "stage": 2
+      ]
     },
     {
       "id": "assumptions",
       "number": "4",
       "title": "Assumptions & Applications",
+      "stage": 2,
       "slides": [
-        "Linearity, independence, homoscedasticity, Gaussian errors, full-rank X",
-        "Squared loss gives every residual influence proportional to its size",
-        "Scenario: a unit-entry error records some prices ×10"
+        "Each assumption can be checked against the data",
+        "Two fail clearly: good and bad news act alike; shocks are normal",
+        "Uses: VaR and capital, position sizing, option pricing"
       ],
       "blocks": [
         {
           "type": "h3",
-          "text": "Assumptions of the Model"
+          "text": "Assumptions of the Baseline"
         },
         {
           "type": "table",
-          "title": "Assumptions of the OLS baseline",
-          "caption": "Each assumption is paired with the question the AI tutor asks when a shock occurs.",
+          "title": "Assumptions of GARCH(1,1) with normal shocks, checked against the training data",
+          "caption": "Training data: daily US market returns, 1990–2014. The last two rows are the assumptions the revised model relaxes.",
           "header": [
             "Assumption",
             "Mathematical form",
-            "Socratic check"
+            "What the data says"
           ],
           "rows": [
             [
-              "Linearity",
-              "E[y | X] = Xβ",
-              "Does the residual plot show curvature?"
+              "Constant mean",
+              "E[rₜ] = μ",
+              "Daily mean 0.044% vs volatility 1.13%; lag-1 autocorrelation -0.03. Reasonable."
             ],
             [
-              "Independence",
-              "Cov(εᵢ, εⱼ) = 0",
-              "Were rows collected independently?"
+              "Volatility depends on the past",
+              "σ²ₜ = ω + α e²ₜ₋₁ + β σ²ₜ₋₁",
+              "Lag-1 autocorrelation of squared returns 0.21. Holds: volatility clusters."
             ],
             [
-              "Homoscedasticity",
-              "Var(εᵢ) = σ²",
-              "Does residual spread grow with ŷ?"
+              "Stationary volatility",
+              "α + β < 1",
+              "Fitted persistence 0.990. Holds, but close to 1."
             ],
             [
-              "Gaussian, light-tailed errors",
-              "ε ~ N(0, σ²I)",
-              "How many residuals exceed 3σ?"
+              "Stable parameters",
+              "ω, α, β fixed over time",
+              "Untested here; parameters are frozen at 2014."
             ],
             [
-              "Full column rank",
-              "rank(X) = p + 1",
-              "Is XᵀX well-conditioned?"
+              "Good and bad news act alike",
+              "Reaction α to e² regardless of sign",
+              "Fails: once allowed, the fitted reaction to good news is close to zero (Section 7)."
+            ],
+            [
+              "Normal shocks",
+              "zₜ ~ N(0, 1)",
+              "Fails: kurtosis 11.3 (normal: 3); 0.60% of days beyond 4 standard deviations (normal: 0.006%)."
             ]
           ]
         },
         {
-          "type": "p",
-          "text": "The Gaussian-error assumption is the one the scenario shock targets. The influence of observation i on the OLS solution grows linearly with its residual, ψ(r) = r, so a single large error can move β̂ arbitrarily far: OLS has a breakdown point of 0."
-        },
-        {
           "type": "h3",
-          "text": "Real-World Applications & Scenario Definition"
+          "text": "Applications"
         },
         {
           "type": "p",
-          "text": "Linear baselines price real estate, forecast demand, and calibrate sensors. In each setting, records can be corrupted by data-entry errors, unit mix-ups, or sensor faults. Our scenario: during a listing-system migration, a share of prices is entered in the wrong unit and recorded ten times too large. The model must still learn the true market relationship."
+          "text": "Volatility forecasts are used to set daily loss limits and capital through Value-at-Risk, to size positions so that a portfolio holds less when risk is high, and to price options, whose value depends directly on expected volatility. In each case, underestimating risk during turbulent periods is the costly mistake."
         }
-      ],
-      "stage": 2
+      ]
     },
     {
       "id": "data",
       "number": "5",
       "title": "Data & Baseline Results",
+      "stage": 2,
       "slides": [
-        "Synthetic data with known β so bias is measured exactly",
-        "Shock: 0–30% of training prices multiplied by 10; test set stays clean",
-        "OLS test RMSE: 40 → 574 at 20% contamination"
+        "Kenneth R. French Data Library: 9,233 trading days, 1990–2026",
+        "Fit on 1990–2014, test on 2015–Aug 2026 (never seen)",
+        "Baseline 1% VaR breached 60 times vs ≈29 expected"
       ],
       "blocks": [
         {
           "type": "h3",
-          "text": "Description of the Data and Scenario Shock"
+          "text": "Data"
         },
         {
           "type": "p",
-          "text": "The prototype uses synthetic data with known ground truth so that estimator bias can be measured exactly; a public housing dataset will be added in the full study. Each replication draws n = 200 training and 1,000 test listings with standardized size and age, true coefficients β = (300, 85, −20) in $1000s, and noise σ = 40. The shock multiplies a fraction c ∈ {0, 5, 10, 20, 30}% of training prices by 10. The test set is never shocked, so test RMSE measures how well each model recovers the real market. Results average 200 replications (seed 623)."
+          "text": "We use the daily US stock market return from the Kenneth R. French Data Library (French, 2026): the value-weighted return of all US-listed stocks on the NYSE, AMEX and NASDAQ, built as the published excess return plus the risk-free rate, in percent. The sample runs from 1990-01-02 to 2026-08-31. We fit every model on 1990-01-02 to 2014-12-31 (6,301 days) and evaluate on 2015-01-02 to 2026-08-31 (2,932 days). Each forecast uses only returns up to the previous day, and parameters are never updated during the test period."
+        },
+        {
+          "type": "table",
+          "title": "Summary statistics of daily US market returns (percent)",
+          "caption": "Kurtosis is 3 for a normal distribution, where only 0.006% of days fall beyond 4 standard deviations.",
+          "numeric": true,
+          "header": [
+            "Statistic",
+            "Train 1990–2014",
+            "Test 2015–2026"
+          ],
+          "rows": [
+            [
+              "Trading days",
+              "6,301",
+              "2,932"
+            ],
+            [
+              "Mean daily return",
+              "0.044",
+              "0.058"
+            ],
+            [
+              "Daily volatility",
+              "1.13",
+              "1.14"
+            ],
+            [
+              "Annualized volatility",
+              "18.0",
+              "18.1"
+            ],
+            [
+              "Skewness",
+              "-0.12",
+              "-0.40"
+            ],
+            [
+              "Kurtosis",
+              "11.3",
+              "16.7"
+            ],
+            [
+              "Days beyond 4 sd",
+              "0.60%",
+              "0.58%"
+            ],
+            [
+              "Lag-1 autocorrelation, returns",
+              "-0.03",
+              "-0.12"
+            ],
+            [
+              "Lag-1 autocorrelation, squared returns",
+              "0.21",
+              "0.44"
+            ],
+            [
+              "Worst day",
+              "-8.96 (2008-12-01)",
+              "-12.00 (2020-03-16)"
+            ],
+            [
+              "Best day",
+              "11.36 (2008-10-13)",
+              "9.67 (2025-04-09)"
+            ]
+          ]
         },
         {
           "type": "h3",
-          "text": "Results of Pure NumPy Execution"
-        },
-        {
-          "type": "figure",
-          "src": "assets/fig_fit.png",
-          "title": "OLS and Huber fits after a 10% scenario shock",
-          "caption": "Hollow circles are shocked rows. OLS is pulled toward them; Huber follows the clean majority."
+          "text": "Baseline Results"
         },
         {
           "type": "p",
-          "text": "At c = 0 OLS reaches the noise floor (RMSE ≈ σ). With only 5% of rows shocked, its test RMSE nearly quadruples, and the coefficient error grows roughly linearly with c. The model has not merely become noisier; it is biased, because every shocked residual pulls the fit with force proportional to its size."
+          "text": "The fitted baseline has ω = 0.0123, α = 0.084 and β = 0.906. Persistence is 0.990, so half of a volatility shock fades in about 67 trading days, and the long-run daily volatility is 1.10%. These values are typical for daily stock returns."
+        },
+        {
+          "type": "p",
+          "text": "Out of sample, the baseline's 1% VaR was breached on 60 of 2,932 days (2.05%), about twice the 29 expected, including 6 breaches during February–April 2020. That is better than the naive past-year rule (76 breaches, 12 in the crash) but still clearly too many. The table in Section 4 points to the two assumptions responsible."
         }
-      ],
-      "stage": 2
+      ]
     },
     {
       "id": "revised",
       "number": "6",
       "title": "Revised Model Formulation",
+      "stage": 3,
       "slides": [
-        "Replace squared loss with Huber loss: quadratic near 0, linear in the tails",
-        "Influence is bounded: ψ(u) = clip(u, −δ, δ)",
-        "Solve by IRLS: weighted least squares with wᵢ = min(1, δ/|uᵢ|)"
+        "Asymmetry: γ adds extra risk only after a bad day",
+        "Heavy tails: standardized Student-t shocks with ν degrees of freedom",
+        "Set γ = 0 and ν → ∞ and the original model comes back"
       ],
       "blocks": [
         {
           "type": "h3",
-          "text": "Improved Model Mechanics"
+          "text": "Revision 1: Bad News Counts More"
         },
         {
           "type": "p",
-          "text": "The diagnosis points to the loss, not the linear structure. We keep y ≈ Xβ but replace the squared loss with the Huber loss applied to scaled residuals uᵢ = rᵢ / s:"
+          "text": "Following Glosten et al. (1993), we add a term γ that switches on only after a negative surprise:"
         },
         {
           "type": "eq",
-          "latex": "\\rho_\\delta(u) = \\begin{cases} \\tfrac{1}{2}u^2 & |u| \\le \\delta \\\\ \\delta |u| - \\tfrac{1}{2}\\delta^2 & |u| > \\delta \\end{cases}, \\qquad \\psi_\\delta(u) = \\rho_\\delta'(u) = \\operatorname{clip}(u, -\\delta, \\delta)",
-          "text": "ρδ(u) = u²/2  for |u| ≤ δ   ρδ(u) = δ|u| − δ²/2  for |u| > δ   ψδ(u) = clip(u, −δ, δ)"
-        },
-        {
-          "type": "h3",
-          "text": "Description of Improvement and Expected Benefit"
+          "latex": "\\sigma_t^2 = \\omega + \\left(\\alpha + \\gamma\\, \\mathbb{1}[e_{t-1} < 0]\\right) e_{t-1}^2 + \\beta \\sigma_{t-1}^2",
+          "text": "σ²ₜ = ω + (α + γ·1[eₜ₋₁ < 0]) e²ₜ₋₁ + β σ²ₜ₋₁"
         },
         {
           "type": "p",
-          "text": "The estimating equation Σ ψδ(rᵢ/s) xᵢ = 0 has no closed form, but writing ψδ(u) = w(u)·u turns it into a weighted least-squares problem:"
+          "text": "Because bad days happen about half the time, persistence becomes α + γ/2 + β, and the constraints become ω > 0, α, γ, β ≥ 0 and α + γ/2 + β < 1."
+        },
+        {
+          "type": "h3",
+          "text": "Revision 2: Heavy-Tailed Shocks"
+        },
+        {
+          "type": "p",
+          "text": "Following Bollerslev (1987), the standard shock z follows a Student-t distribution with ν degrees of freedom, rescaled to variance 1 so that σ keeps its meaning. Each day contributes"
         },
         {
           "type": "eq",
-          "latex": "w_i = \\min\\!\\left(1, \\frac{\\delta}{|u_i|}\\right), \\qquad \\hat\\beta^{(t+1)} = (X^\\top W^{(t)} X)^{-1} X^\\top W^{(t)} y",
-          "text": "wᵢ = min(1, δ/|uᵢ|),   β⁽ᵗ⁺¹⁾ = (XᵀW⁽ᵗ⁾X)⁻¹XᵀW⁽ᵗ⁾y"
+          "latex": "\\ell_t = \\ln\\Gamma\\left(\\tfrac{\\nu+1}{2}\\right) - \\ln\\Gamma\\left(\\tfrac{\\nu}{2}\\right) - \\tfrac{1}{2}\\ln\\big(\\pi(\\nu-2)\\big) - \\tfrac{1}{2}\\ln\\sigma_t^2 - \\tfrac{\\nu+1}{2}\\ln\\left(1 + \\frac{e_t^2}{\\sigma_t^2(\\nu-2)}\\right)",
+          "text": "ℓₜ = ln Γ((ν+1)/2) − ln Γ(ν/2) − ½ ln(π(ν−2)) − ½ ln σ²ₜ   − ((ν+1)/2) ln(1 + e²ₜ / (σ²ₜ(ν−2)))"
         },
         {
           "type": "p",
-          "text": "The scale is re-estimated each iteration with the normalized median absolute deviation, s = 1.4826 · median|rᵢ − median(r)|, which is itself robust. With δ = 1.345 the estimator retains about 95% of OLS efficiency when errors are truly Gaussian, while bounding each observation's influence at δ. Because ρδ is convex, IRLS converges to the global minimum from the OLS warm start. In code, the weighted solve is performed as an ordinary least-squares solve on rows scaled by √wᵢ, which avoids forming XᵀWX."
+          "text": "to the log-likelihood. We require ν > 2 so the variance exists, mapping ν = 2 + exp(z) in the optimizer. The VaR quantile of the standardized t has no closed form in NumPy, so we compute its distribution function by numerical integration after substituting x = tan θ, then invert it."
         },
         {
           "type": "h3",
-          "text": "Target Applications"
+          "text": "A Strict Extension"
         },
         {
           "type": "p",
-          "text": "Huber regression suits any pipeline where a minority of records may be grossly wrong but cannot be identified in advance: migrated listing data, sensor streams with spikes, and financial records with keying errors."
+          "text": "Setting γ = 0 and letting ν grow without bound returns the original model, so any improvement comes from the two relaxed assumptions alone. To measure each revision separately, we also fit the two in-between models: GARCH with Student-t shocks and GJR-GARCH with normal shocks."
         }
-      ],
-      "stage": 3
+      ]
     },
     {
       "id": "results",
       "number": "7",
       "title": "Results & Comparison",
+      "stage": 3,
       "slides": [
-        "Huber stays near the noise floor through 20% contamination",
-        "At 30% Huber degrades (RMSE 62): the shock is one-sided",
-        "Cost: ~10–17 IRLS iterations instead of one solve"
+        "Revised model: α ≈ 0.001, γ ≈ 0.141: fear is louder than greed",
+        "1% VaR breaches: 60 → 51; COVID crash: 6 → 2",
+        "Best out-of-sample log score: 1.337 → 1.287"
       ],
       "blocks": [
         {
           "type": "h3",
-          "text": "Empirical Results"
+          "text": "Fitted Models"
         },
         {
           "type": "table",
-          "title": "Clean-test RMSE and coefficient error under the scenario shock",
-          "caption": "Mean over 200 replications. RMSE in $1000s; σ = 40 is the irreducible floor.",
-          "source": "results"
-        },
-        {
-          "type": "figure",
-          "src": "assets/fig_sweep.png",
-          "title": "Test RMSE as the shock grows",
-          "caption": "OLS error grows linearly with contamination; Huber stays near the noise floor until the shock reaches 30%."
-        },
-        {
-          "type": "h3",
-          "text": "Comparison Matrix"
-        },
-        {
-          "type": "table",
-          "title": "Original vs. revised model",
-          "caption": "Qualitative and computational comparison.",
+          "title": "Parameters fitted on 1990–2014",
+          "numeric": true,
+          "caption": "Lower AIC and BIC are better. Half-life is in trading days. ν = ∞ denotes normal shocks.",
           "header": [
-            "Property",
-            "OLS (original)",
-            "Huber-IRLS (revised)"
+            "Model",
+            "ω",
+            "α",
+            "γ",
+            "β",
+            "ν",
+            "Persistence",
+            "Half-life",
+            "AIC",
+            "BIC"
           ],
           "rows": [
             [
-              "Loss",
-              "½r²",
-              "Huber ρδ(r/s)"
+              "GARCH, normal (original)",
+              "0.0123",
+              "0.084",
+              "—",
+              "0.906",
+              "∞",
+              "0.9898",
+              "67",
+              "16,799",
+              "16,826"
             ],
             [
-              "Influence function",
-              "Unbounded, ψ(u) = u",
-              "Bounded, |ψ(u)| ≤ δ"
+              "GARCH, Student-t",
+              "0.0072",
+              "0.074",
+              "—",
+              "0.922",
+              "7.1",
+              "0.9959",
+              "168",
+              "16,577",
+              "16,611"
             ],
             [
-              "Solution",
-              "One least-squares solve",
-              "Iterated weighted solves"
+              "GJR-GARCH, normal",
+              "0.0160",
+              "0.005",
+              "0.137",
+              "0.909",
+              "∞",
+              "0.9828",
+              "40",
+              "16,600",
+              "16,634"
             ],
             [
-              "Efficiency, Gaussian noise",
-              "100%",
-              "≈ 95% (δ = 1.345)"
-            ],
-            [
-              "Robust to vertical outliers",
-              "No (breakdown 0)",
-              "Yes, up to moderate contamination"
-            ],
-            [
-              "Robust to leverage points",
-              "No",
-              "No"
+              "GJR-GARCH, Student-t (revised)",
+              "0.0116",
+              "0.001",
+              "0.141",
+              "0.918",
+              "8.0",
+              "0.9892",
+              "64",
+              "16,411",
+              "16,451"
             ]
           ]
+        },
+        {
+          "type": "p",
+          "text": "Each revision lowers AIC on its own, and together they lower it by 388. Once γ is allowed, α falls almost to zero (α = 0.001, γ = 0.141 in the revised model): in this data, good surprises barely raise tomorrow's volatility, while bad surprises raise it sharply. The fitted ν ≈ 8 confirms that shocks have heavier tails than a normal distribution."
+        },
+        {
+          "type": "figure",
+          "src": "assets/fig_garch_news.png",
+          "title": "Tomorrow's volatility as a function of today's surprise",
+          "caption": "Starting from each model's long-run volatility. After a −3% day the revised model predicts about 1.51% volatility; after a +3% day, about 1.00%. The original model predicts 1.36% for both."
+        },
+        {
+          "type": "h3",
+          "text": "Value-at-Risk Backtests"
+        },
+        {
+          "type": "table",
+          "title": "1% VaR backtest on the test period (2,932 days; about 29 breaches expected)",
+          "numeric": true,
+          "caption": "p-values below 0.05 reject the model. Average VaR is the mean daily loss limit in percent.",
+          "header": [
+            "Model",
+            "Breaches",
+            "Rate",
+            "Kupiec p",
+            "Christoffersen p",
+            "Feb–Apr 2020 breaches",
+            "Avg VaR"
+          ],
+          "rows": [
+            [
+              "Rolling 250-day",
+              "76",
+              "2.59%",
+              "< 0.001",
+              "< 0.001",
+              "12",
+              "-2.43"
+            ],
+            [
+              "EWMA (λ = 0.94)",
+              "67",
+              "2.29%",
+              "< 0.001",
+              "< 0.001",
+              "6",
+              "-2.26"
+            ],
+            [
+              "GARCH, normal (original)",
+              "60",
+              "2.05%",
+              "< 0.001",
+              "< 0.001",
+              "6",
+              "-2.28"
+            ],
+            [
+              "GARCH, Student-t",
+              "56",
+              "1.91%",
+              "< 0.001",
+              "< 0.001",
+              "6",
+              "-2.51"
+            ],
+            [
+              "GJR-GARCH, normal",
+              "58",
+              "1.98%",
+              "< 0.001",
+              "< 0.001",
+              "5",
+              "-2.26"
+            ],
+            [
+              "GJR-GARCH, Student-t (revised)",
+              "51",
+              "1.74%",
+              "< 0.001",
+              "< 0.001",
+              "2",
+              "-2.47"
+            ]
+          ]
+        },
+        {
+          "type": "table",
+          "title": "5% VaR backtest on the test period (about 147 breaches expected)",
+          "numeric": true,
+          "caption": "p-values below 0.05 reject the model.",
+          "header": [
+            "Model",
+            "Breaches",
+            "Rate",
+            "Kupiec p",
+            "Christoffersen p",
+            "Feb–Apr 2020 breaches",
+            "Avg VaR"
+          ],
+          "rows": [
+            [
+              "Rolling 250-day",
+              "161",
+              "5.49%",
+              "0.229",
+              "< 0.001",
+              "14",
+              "-1.71"
+            ],
+            [
+              "EWMA (λ = 0.94)",
+              "180",
+              "6.14%",
+              "0.006",
+              "0.002",
+              "8",
+              "-1.58"
+            ],
+            [
+              "GARCH, normal (original)",
+              "163",
+              "5.56%",
+              "0.172",
+              "0.167",
+              "6",
+              "-1.60"
+            ],
+            [
+              "GARCH, Student-t",
+              "172",
+              "5.87%",
+              "0.036",
+              "0.020",
+              "7",
+              "-1.58"
+            ],
+            [
+              "GJR-GARCH, normal",
+              "149",
+              "5.08%",
+              "0.839",
+              "0.456",
+              "7",
+              "-1.59"
+            ],
+            [
+              "GJR-GARCH, Student-t (revised)",
+              "154",
+              "5.25%",
+              "0.534",
+              "0.325",
+              "7",
+              "-1.57"
+            ]
+          ]
+        },
+        {
+          "type": "p",
+          "text": "At 1%, every model breaches too often and all are rejected, but the revised model comes closest (51 breaches vs 60 for the original) and was caught out on only 2 days during the COVID crash. At 5%, both GARCH models pass both tests. The rolling rule has the most cautious average limit at 1% yet the most breaches, because its caution arrives at the wrong time: it adapts too slowly going into a crisis and stays cautious long after."
+        },
+        {
+          "type": "h3",
+          "text": "Out-of-Sample Fit"
+        },
+        {
+          "type": "table",
+          "title": "Average negative log-likelihood per test day",
+          "numeric": true,
+          "caption": "Lower is better. This scores the whole forecast distribution on every day, not just the tail.",
+          "header": [
+            "Model",
+            "−log L per day"
+          ],
+          "rows": [
+            [
+              "Rolling 250-day",
+              "1.5163"
+            ],
+            [
+              "EWMA (λ = 0.94)",
+              "1.3598"
+            ],
+            [
+              "GARCH, normal (original)",
+              "1.3370"
+            ],
+            [
+              "GARCH, Student-t",
+              "1.3080"
+            ],
+            [
+              "GJR-GARCH, normal",
+              "1.3156"
+            ],
+            [
+              "GJR-GARCH, Student-t (revised)",
+              "1.2867"
+            ]
+          ]
+        },
+        {
+          "type": "p",
+          "text": "The ranking matches the training-sample AIC: each revision helps on its own, the two combine, and the revised model forecasts unseen data best of all six."
         }
-      ],
-      "stage": 3
+      ]
     },
     {
       "id": "discussion",
       "number": "8",
       "title": "Discussion & Future Work",
+      "stage": 3,
       "slides": [
-        "The shock exposed an assumption, not a bug",
-        "Huber's bounded influence still adds up when all outliers push one way",
-        "Next: redescending losses, leverage-robust estimators, real data"
+        "The revision narrows the 1% gap but does not close it",
+        "Frozen 2014 parameters, a wilder test period, and remaining tail and skew",
+        "Next: rolling re-estimation, skewed-t, Expected Shortfall, significance tests"
       ],
       "blocks": [
         {
           "type": "h3",
-          "text": "Discussion of Results"
+          "text": "What the Revision Fixed"
         },
         {
           "type": "p",
-          "text": "The shock did not reveal a coding error; both implementations are correct. It revealed that OLS answers a different question (the conditional mean under light tails) than the scenario asked. The revision succeeded because it targeted the violated assumption precisely: the linear structure was kept and only the loss changed."
-        },
-        {
-          "type": "p",
-          "text": "Huber's degradation at 30% is itself instructive. Each shocked row's influence is bounded, but all shocked rows push upward, so their bounded contributions accumulate into bias. Learners can predict this from ψδ before running the experiment."
+          "text": "Both relaxed assumptions matter. Letting bad news count more makes the model react faster when markets start falling, which is when VaR breaches cluster. Heavy-tailed shocks widen the 1% limit by about 8% for the same volatility (quantile −2.51 instead of −2.33). Together they cut 1% breaches during the 2020 crash from six to two."
         },
         {
           "type": "h3",
-          "text": "Strategic Future Improvements"
+          "text": "Why the 1% Level Still Fails"
         },
         {
           "type": "list",
           "items": [
-            "Redescending M-estimators (Tukey bisquare) whose weights fall to zero for gross outliers.",
-            "High-breakdown estimators such as least trimmed squares for leverage points.",
-            "A real public housing dataset with an injected, documented shock.",
-            "Additional scenarios: heteroscedasticity → weighted least squares; class imbalance → weighted logistic regression.",
-            "A study of learner outcomes with and without the AI-guided Socratic prompts."
+            "Parameters were estimated once, on data ending in 2014, and never updated.",
+            "The test period was more extreme than training (kurtosis 16.7 vs 11.3).",
+            "Even the fitted Student-t (ν ≈ 8) allows about 0.17% of days beyond 4 standard deviations, against 0.6% observed.",
+            "Returns are negatively skewed (-0.40 in the test period), while the Student-t is symmetric."
+          ]
+        },
+        {
+          "type": "h3",
+          "text": "Limitations"
+        },
+        {
+          "type": "p",
+          "text": "We study one market. We have not yet tested whether the out-of-sample log-score improvement is statistically significant. VaR also says nothing about how large losses are once the limit is crossed."
+        },
+        {
+          "type": "h3",
+          "text": "Future Work"
+        },
+        {
+          "type": "list",
+          "items": [
+            "Re-estimate the parameters on a rolling window during the test period.",
+            "Replace the Student-t with a skewed distribution.",
+            "Add Expected Shortfall, the average loss beyond VaR.",
+            "Test the log-score difference formally and repeat the study on the 12 French industry portfolios."
           ]
         }
-      ],
-      "stage": 3
+      ]
     },
     {
       "id": "lessons",
       "number": "9",
       "title": "Lessons Learned",
+      "stage": 3,
       "slides": [
-        "Derive before you import: the loss function is the model's opinion about errors",
-        "Test on clean data after training on shocked data",
-        "Revise the assumption that broke, not the whole model"
+        "Direction is unpredictable; size is predictable",
+        "A calm year makes you underestimate tomorrow",
+        "Revise the assumption that broke, then measure each fix"
       ],
       "blocks": [
         {
           "type": "list",
           "items": [
-            "The loss function encodes an assumption about errors; choosing a loss is a statistical decision, not a coding detail.",
-            "A model can fit its training data well while learning the wrong relationship; separating a clean evaluation set from shocked training data makes that visible.",
-            "A targeted revision outperforms a wholesale model change: Huber kept the interpretability of linear regression.",
-            "Numerical choices matter: SVD-based solves and √w row-scaling avoid the conditioning problems of explicit inverses."
+            "Look at the data before choosing a model: the autocorrelation of squared returns and the kurtosis told us which assumptions would fail.",
+            "When the quantity of interest is never observed, likelihood is the tool; writing the optimizer ourselves made every constraint and starting value an explicit decision.",
+            "Revise one assumption at a time and fit the in-between models, so each fix has to earn its place.",
+            "Judge forecasts on data the model has not seen, and report failures honestly: every model failed the 1% test, and that result points to the next revision."
           ]
         }
-      ],
-      "stage": 3
+      ]
     }
   ],
   "references": [
@@ -613,16 +905,20 @@
   ],
   "appendix": [
     {
-      "title": "Appendix A. Original Model (Python + NumPy)",
-      "code": "model/baseline.py"
+      "title": "Appendix A. Original and Revised Models (Python + NumPy)",
+      "code": "model/garch.py"
     },
     {
-      "title": "Appendix B. Revised Model (Python + NumPy)",
-      "code": "model/revised.py"
+      "title": "Appendix B. Nelder–Mead Optimizer (Python + NumPy)",
+      "code": "model/optim.py"
     },
     {
-      "title": "Appendix C. Repository and Deployment Blueprint",
-      "text": "The repository contains the NumPy models (model/), the experiment runner (model/run_experiment.py), the GitHub Pages portal (index.html, style.css, script.js), the slide deck (presentations/), and local builders for the Word and PowerPoint versions (tools/). Every push to main deploys the static site through GitHub Actions. To reproduce all results and documents locally, run: python3 model/run_experiment.py && python3 tools/make_figures.py && python3 tools/build_docx.py && python3 tools/build_pptx.py"
+      "title": "Appendix C. Backtest Experiment (Python + NumPy)",
+      "code": "model/run_garch.py"
+    },
+    {
+      "title": "Appendix D. Repository and Deployment Blueprint",
+      "text": "The repository contains the NumPy models and tests (model/), the data downloader (tools/fetch_french.py) and data (data/), the experiment runner (model/run_garch.py), the GitHub Pages portal (index.html, style.css, script.js), the slide deck (presentations/), and local builders for the Word and PowerPoint versions (tools/). Every push to main deploys the static site through GitHub Actions. To reproduce all results and documents locally, run: make test && make garch && python3 tools/build_docx.py --stage 3 && python3 tools/build_pptx.py"
     }
   ],
   "draft": {

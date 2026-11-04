@@ -1,4 +1,4 @@
-"""Build a 16:9 PowerPoint deck from paper/content.json and results/results.json.
+"""Build a 16:9 PowerPoint deck from paper/content.json and results/garch_results.json.
 
 Usage:  python3 tools/build_pptx.py      ->  build/scenario-stat-modeling.pptx
 """
@@ -69,7 +69,7 @@ def table(slide, header, rows, top=Inches(2.2), width=Inches(11.7)):
 def build(out):
     with open(os.path.join(ROOT, "paper", "content.json")) as f:
         paper = json.load(f)
-    with open(os.path.join(ROOT, "results", "results.json")) as f:
+    with open(os.path.join(ROOT, "results", "garch_results.json")) as f:
         results = json.load(f)
     prs = Presentation()
     prs.slide_width, prs.slide_height = W, H
@@ -78,28 +78,39 @@ def build(out):
     names = " & ".join(au["name"] for au in paper["authors"])
     s = blank(prs, a["course"])
     text(s, paper["short_title"], MARGIN, Inches(2.2), Inches(11.7), Inches(1.2), 48, FG, True)
-    text(s, "An AI-guided framework for deriving and revising algorithmic baselines from scratch",
+    text(s, "Revising GARCH into an asymmetric, heavy-tailed model for Value-at-Risk",
          MARGIN, Inches(3.5), Inches(11), Inches(1), 22, DIM)
     text(s, f"{names} — {a['program']}, {a['university']}", MARGIN, Inches(5.6),
          Inches(11), Inches(0.5), 16, DIM)
 
-    s = blank(prs, "Framework", "Derive → Implement → Shock → Diagnose → Revise")
-    bullets(s, ["Derive the estimator from a loss function, by hand",
-                "Implement it in vectorized NumPy — no scikit-learn, no SciPy fitting",
-                "Shock it with a realistic data failure; evaluate on clean data",
-                "Diagnose which assumption broke; derive a targeted revision"])
+    s = blank(prs, "Approach", "Derive → Implement → Test on a crisis → Diagnose → Revise")
+    bullets(s, ["Derive GARCH(1,1) and its likelihood by hand",
+                "Implement fitting, quantiles and backtests in NumPy only (no SciPy)",
+                "Fit on 1990–2014 daily US market returns; test on 2015–Aug 2026",
+                "Diagnose which assumptions fail; revise into GJR-GARCH with Student-t shocks"])
 
+    labels = {"rolling": "Past-year rule", "ewma": "EWMA (λ = 0.94)", "garch-n": "GARCH, normal (original)",
+              "garch-t": "GARCH, Student-t", "gjr-n": "GJR-GARCH, normal",
+              "gjr-t": "GJR-GARCH-t (revised)"}
     for sec in paper["sections"]:
         s = blank(prs, f"Section {sec['number']}", sec["title"])
         bullets(s, sec["slides"])
+        if sec["id"] == "data":
+            s = blank(prs, "Test on a crisis", "1% VaR limits through the 2020 crash")
+            s.shapes.add_picture(os.path.join(ROOT, "assets", "fig_garch_covid.png"),
+                                 Inches(1.4), Inches(2.0), height=Inches(4.9))
         if sec["id"] == "results":
-            s = blank(prs, "Results", "Clean-test RMSE under the scenario shock ($1000s)")
-            rows = [[f"{r['contamination']:.0%}", f"{r['ols_rmse']:.1f}", f"{r['hub_rmse']:.1f}",
-                     f"{r['ols_berr']:.1f}", f"{r['hub_berr']:.1f}"] for r in results["rows"]]
-            table(s, ["Shock", "OLS RMSE", "Huber RMSE", "OLS ‖β̂−β‖", "Huber ‖β̂−β‖"], rows)
-            s = blank(prs, "Results", "OLS error grows with the shock; Huber stays near σ")
-            s.shapes.add_picture(os.path.join(ROOT, "assets", "fig_sweep.png"),
-                                 Inches(3.2), Inches(2.0), height=Inches(4.9))
+            s = blank(prs, "Finding", "Fear is louder than greed")
+            s.shapes.add_picture(os.path.join(ROOT, "assets", "fig_garch_news.png"),
+                                 Inches(3.0), Inches(2.0), height=Inches(4.9))
+            n = results["meta"]["test_days"]
+            s = blank(prs, f"Results · {n:,} test days, 2015–2026", f"1% VaR backtest (≈{round(0.01 * n)} breaches expected)")
+            rows = []
+            for k, e in results["models"].items():
+                b = e["var_0.01"]
+                rows.append([labels[k], f"{b['breaches']}", f"{b['rate']:.2%}", f"{b['stress_breaches']}",
+                             f"{e['test_neg_loglik_per_day']:.3f}"])
+            table(s, ["Model", "Breaches", "Rate", "Feb–Apr 2020", "−log L / day"], rows)
 
     s = blank(prs, "Resources", "Paper, code, and live demo")
     bullets(s, ["Portal: https://clarkngo.github.io/scenario-stat-modeling/",

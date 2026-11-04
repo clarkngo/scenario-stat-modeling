@@ -1,6 +1,6 @@
-/* Scenario-Driven Statistical Modeling — portal script.
- * Renders the paper from paper/content.json, runs the in-browser OLS vs Huber lab,
- * and drives the outline scrollspy, code tabs, and theme toggle. */
+/* Forecasting Market Risk from Scratch — portal script.
+ * Renders the paper from paper/content.json, runs the in-browser Value-at-Risk lab on the
+ * real daily returns, and drives the outline scrollspy, code tabs, and theme toggle. */
 (function () {
   "use strict";
 
@@ -29,27 +29,20 @@
   /* ---------------- Paper rendering ---------------- */
   let nTable = 0, nFig = 0;
 
-  function renderTable(b, results) {
+  function renderTable(b) {
     nTable += 1;
     const frag = document.createDocumentFragment();
     frag.append(el("p", { class: "tbl-label" }, `Table ${nTable}`), el("p", { class: "tbl-title" }, b.title));
-    let header = b.header, rows = b.rows, numeric = false;
-    if (b.source === "results") {
-      numeric = true;
-      header = ["Shock", "OLS RMSE", "Huber RMSE", "OLS ‖β̂−β‖", "Huber ‖β̂−β‖", "IRLS iters"];
-      rows = results.rows.map((r) => [
-        `${Math.round(r.contamination * 100)}%`, r.ols_rmse.toFixed(1), r.hub_rmse.toFixed(1),
-        r.ols_berr.toFixed(1), r.hub_berr.toFixed(1), r.hub_iter.toFixed(1)]);
-    }
+    const numeric = !!b.numeric;   // right-align every column after the first
     const wrap = el("div", { class: "table-wrap" });
     const t = el("table");
     const tr = el("tr");
-    header.forEach((h, j) => tr.append(el("th", numeric && j ? { class: "num" } : {}, h)));
+    b.header.forEach((h, j) => tr.append(el("th", numeric && j ? { class: "num" } : {}, h)));
     const thead = el("thead");
     thead.append(tr);
     t.append(thead);
     const tb = el("tbody");
-    rows.forEach((row) => {
+    b.rows.forEach((row) => {
       const r = el("tr");
       row.forEach((v, j) => r.append(el("td", numeric && j ? { class: "num" } : {}, v)));
       tb.append(r);
@@ -60,7 +53,7 @@
     return frag;
   }
 
-  function renderBlock(b, results) {
+  function renderBlock(b) {
     switch (b.type) {
       case "p": return el("p", {}, b.text);
       case "h3": return el("h3", {}, b.text);
@@ -70,7 +63,7 @@
         b.items.forEach((i) => ul.append(el("li", {}, i)));
         return ul;
       }
-      case "table": return renderTable(b, results);
+      case "table": return renderTable(b);
       case "figure": {
         nFig += 1;
         const f = el("figure");
@@ -82,7 +75,7 @@
     }
   }
 
-  function renderPaper(paper, results) {
+  function renderPaper(paper) {
     const a = paper.affiliation;
     const names = paper.authors.map((x) => x.name).join(" & ");
     $("#course").textContent = a.course;
@@ -96,7 +89,7 @@
     paper.sections.forEach((s) => {
       const sec = el("section", { id: s.id, class: "paper-section" });
       sec.append(el("h2", {}, `${s.number}. ${s.title}`));
-      s.blocks.forEach((b) => sec.append(renderBlock(b, results)));
+      s.blocks.forEach((b) => sec.append(renderBlock(b)));
       body.append(sec);
     });
     const refs = el("section", { id: "references", class: "paper-section" });
@@ -152,83 +145,45 @@
       `Could not load paper content (${err.message}). Serve the folder over HTTP, e.g. "python3 -m http.server", instead of opening the file directly.`));
   }
 
-  Promise.all([
-    fetch("paper/content.json").then((r) => r.json()),
-    fetch("results/results.json").then((r) => r.json()),
-  ]).then(([p, r]) => renderPaper(p, r)).catch(loadFailed);
+  fetch("paper/content.json").then((r) => r.json()).then(renderPaper).catch(loadFailed);
 
-  /* ---------------- Lab: OLS vs Huber in the browser ---------------- */
-  // Mirrors model/baseline.py and model/revised.py for one feature: y = b0 + b1 x.
-  const TRUE = { b0: 300, b1: 85, sd: 40 };
-  const N_TRAIN = 150, N_TEST = 600;
-  let seed = 623;
+  /* ---------------- Lab: Value-at-Risk replay on real data ---------------- */
+  // Mirrors model/garch.py: the same variance recursion, started in 1990 with the
+  // parameters and quantiles that model/run_garch.py fitted on 1990–2014.
+  const PERIODS = {
+    covid: [20200101, 20200701, "January–June 2020"],
+    y2022: [20220101, 20230101, "2022"],
+    y2025: [20250201, 20250701, "February–June 2025"],
+    test: [20150101, 20270101, "The full test period, 2015–2026"],
+    gfc: [20080701, 20090701, "July 2008–June 2009 (inside the training data)"],
+  };
+  const LAB_MODELS = [
+    { key: "rolling", label: "Past-year rule", color: "--pt" },
+    { key: "garch-n", label: "GARCH, normal", color: "--ols" },
+    { key: "gjr-t", label: "GJR-GARCH-t", color: "--hub" },
+  ];
+  const lab = { period: "covid", level: "0.01", dates: null, r: null, sigma: {}, models: null };
 
-  function mulberry32(a) {
-    return function () {
-      a |= 0; a = (a + 0x6d2b79f5) | 0;
-      let t = Math.imul(a ^ (a >>> 15), 1 | a);
-      t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
-      return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
-    };
-  }
-  function normalSampler(rand) {
-    return () => {
-      const u = Math.max(rand(), 1e-12), v = rand();
-      return Math.sqrt(-2 * Math.log(u)) * Math.cos(2 * Math.PI * v);   // Box–Muller
-    };
-  }
-  function makeData(n, randn) {
-    const x = new Float64Array(n), y = new Float64Array(n);
-    for (let i = 0; i < n; i++) { x[i] = randn(); y[i] = TRUE.b0 + TRUE.b1 * x[i] + TRUE.sd * randn(); }
-    return { x, y };
-  }
-  function shuffledIndex(n, rand) {
-    const idx = Array.from({ length: n }, (_, i) => i);
-    for (let i = n - 1; i > 0; i--) { const j = Math.floor(rand() * (i + 1)); [idx[i], idx[j]] = [idx[j], idx[i]]; }
-    return idx;
-  }
-
-  // Weighted least squares for one feature; w = 1 gives OLS.
-  function wls(x, y, w) {
-    let sw = 0, sx = 0, sy = 0;
-    for (let i = 0; i < x.length; i++) { sw += w[i]; sx += w[i] * x[i]; sy += w[i] * y[i]; }
-    const mx = sx / sw, my = sy / sw;
-    let sxy = 0, sxx = 0;
-    for (let i = 0; i < x.length; i++) { const dx = x[i] - mx; sxy += w[i] * dx * (y[i] - my); sxx += w[i] * dx * dx; }
-    const b1 = sxy / Math.max(sxx, 1e-12);
-    return { b0: my - b1 * mx, b1 };
-  }
-  function median(a) {
-    const s = Float64Array.from(a).sort(), m = s.length >> 1;
-    return s.length % 2 ? s[m] : 0.5 * (s[m - 1] + s[m]);
-  }
-  function huber(x, y, delta, maxIter = 100, tol = 1e-8) {
-    const n = x.length;
-    let beta = wls(x, y, new Float64Array(n).fill(1));
-    const w = new Float64Array(n), r = new Float64Array(n);
-    let it = 0, s = 1;
-    for (it = 1; it <= maxIter; it++) {
-      for (let i = 0; i < n; i++) r[i] = y[i] - beta.b0 - beta.b1 * x[i];
-      const med = median(r);
-      s = Math.max(1.4826 * median(r.map((v) => Math.abs(v - med))), 1e-12);
-      for (let i = 0; i < n; i++) w[i] = Math.min(1, delta / Math.max(Math.abs(r[i] / s), 1e-12));
-      const nb = wls(x, y, w);
-      const step = Math.hypot(nb.b0 - beta.b0, nb.b1 - beta.b1);
-      beta = nb;
-      if (step <= tol * (1 + Math.hypot(beta.b0, beta.b1))) break;
+  function garchSigma(p, r) {
+    const out = new Float64Array(r.length);
+    let s2 = p.s2_0;
+    out[0] = Math.sqrt(s2);
+    for (let t = 1; t < r.length; t++) {
+      const e = r[t - 1] - p.mu;
+      s2 = p.omega + (p.alpha + (e < 0 ? p.gamma : 0)) * e * e + p.beta * s2;
+      out[t] = Math.sqrt(s2);
     }
-    return { ...beta, w, iters: Math.min(it, maxIter), s };
+    return out;
   }
-  function rmse(beta, d) {
-    let acc = 0;
-    for (let i = 0; i < d.x.length; i++) { const e = d.y[i] - beta.b0 - beta.b1 * d.x[i]; acc += e * e; }
-    return Math.sqrt(acc / d.x.length);
-  }
-
-  let labData = null;
-  function sampleLab() {
-    const rand = mulberry32(seed), randn = normalSampler(rand);
-    labData = { train: makeData(N_TRAIN, randn), test: makeData(N_TEST, randn), order: shuffledIndex(N_TRAIN, rand) };
+  function rollingSigma(r, w = 250) {
+    const out = new Float64Array(r.length).fill(NaN);
+    let s = 0, s2 = 0;
+    for (let t = 0; t < r.length; t++) {
+      if (t >= w) { const m = s / w; out[t] = Math.sqrt(Math.max(s2 / w - m * m, 0)); }
+      s += r[t]; s2 += r[t] * r[t];
+      if (t >= w) { s -= r[t - w]; s2 -= r[t - w] * r[t - w]; }
+    }
+    return out;
   }
 
   const SVG_NS = "http://www.w3.org/2000/svg";
@@ -238,109 +193,140 @@
     return n;
   };
   const cssVar = (name) => getComputedStyle(document.documentElement).getPropertyValue(name).trim();
+  const fmtDate = (d) => `${String(d).slice(0, 4)}-${String(d).slice(4, 6)}-${String(d).slice(6)}`;
+  const MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
 
   function drawLab() {
-    if (!labData) return;
-    const c = +$("#cIn").value / 100, factor = +$("#fIn").value, delta = +$("#dIn").value;
-    $("#cOut").textContent = `${Math.round(c * 100)}%`;
-    $("#fOut").textContent = `×${factor}`;
-    $("#dOut").textContent = delta.toFixed(3);
-
-    const { train, test, order } = labData;
-    const y = Float64Array.from(train.y), shocked = new Uint8Array(N_TRAIN);
-    const k = Math.round(c * N_TRAIN);
-    for (let j = 0; j < k; j++) { y[order[j]] *= factor; shocked[order[j]] = 1; }
-    const ols = wls(train.x, y, new Float64Array(N_TRAIN).fill(1));
-    const hub = huber(train.x, y, delta);
+    if (!lab.dates) return;
+    const [d0, d1, periodName] = PERIODS[lab.period];
+    let i0 = lab.dates.findIndex((d) => d >= d0), i1 = lab.dates.findIndex((d) => d >= d1);
+    if (i1 < 0) i1 = lab.dates.length;
+    const n = i1 - i0, lv = +lab.level;
+    const series = LAB_MODELS.map((m) => {
+      const p = lab.models[m.key];
+      const mu = p.params ? p.params.mu : lab.models["garch-n"].params.mu;
+      const q = p.quantiles[lab.level], sig = lab.sigma[m.key];
+      const v = new Float64Array(n), hit = new Uint8Array(n);
+      for (let k = 0; k < n; k++) { v[k] = mu + q * sig[i0 + k]; hit[k] = lab.r[i0 + k] < v[k] ? 1 : 0; }
+      return { ...m, v, hit };
+    });
 
     // Chart geometry.
-    const W = 640, H = 380, m = { l: 56, r: 64, t: 12, b: 42 };
-    const X0 = -3.2, X1 = 3.2, Y0 = -100, Y1 = 1100;
-    const sx = (v) => m.l + ((v - X0) / (X1 - X0)) * (W - m.l - m.r);
-    const sy = (v) => m.t + (1 - (v - Y0) / (Y1 - Y0)) * (H - m.t - m.b);
+    const W = 720, H = 380, mg = { l: 48, r: 14, t: 12, b: 70 };
+    let lo = 0, hi = 0;
+    for (let k = 0; k < n; k++) {
+      lo = Math.min(lo, lab.r[i0 + k]); hi = Math.max(hi, lab.r[i0 + k]);
+      series.forEach((s) => { lo = Math.min(lo, s.v[k]); });
+    }
+    const step = hi - lo > 12 ? 5 : hi - lo > 6 ? 2 : 1;
+    lo = Math.floor(lo / step) * step; hi = Math.ceil(hi / step) * step;
+    const plotB = H - mg.b;
+    const sx = (k) => mg.l + (k + 0.5) / n * (W - mg.l - mg.r);
+    const sy = (v) => mg.t + (1 - (v - lo) / (hi - lo)) * (plotB - mg.t);
     const svg = $("#chart");
     svg.setAttribute("viewBox", `0 0 ${W} ${H}`);
     svg.replaceChildren();
-    const grid = cssVar("--border"), dim = cssVar("--fg-dim"), fg = cssVar("--fg"), bg = cssVar("--bg");
+    const grid = cssVar("--border"), dim = cssVar("--fg-dim"), fg = cssVar("--fg");
 
-    const defs = svgEl("defs", {});
-    const clip = svgEl("clipPath", { id: "plotClip" });
-    clip.append(svgEl("rect", { x: m.l, y: m.t, width: W - m.l - m.r, height: H - m.t - m.b }));
-    defs.append(clip);
-    svg.append(defs);
-
-    for (let v = 0; v <= 1000; v += 250) {
-      svg.append(svgEl("line", { x1: m.l, x2: W - m.r, y1: sy(v), y2: sy(v), stroke: grid, "stroke-width": 1 }));
-      const t = svgEl("text", { x: m.l - 8, y: sy(v) + 4, "text-anchor": "end", "font-size": 11, fill: dim });
-      t.textContent = v; svg.append(t);
+    for (let v = lo; v <= hi + 1e-9; v += step) {
+      svg.append(svgEl("line", { x1: mg.l, x2: W - mg.r, y1: sy(v), y2: sy(v), stroke: v === 0 ? dim : grid, "stroke-width": 1 }));
+      const t = svgEl("text", { x: mg.l - 8, y: sy(v) + 4, "text-anchor": "end", "font-size": 11, fill: dim });
+      t.textContent = `${v}%`; svg.append(t);
     }
-    for (let v = -3; v <= 3; v++) {
-      const t = svgEl("text", { x: sx(v), y: H - m.b + 18, "text-anchor": "middle", "font-size": 11, fill: dim });
-      t.textContent = v; svg.append(t);
+    // Month (or year) ticks.
+    const longSpan = n > 400;
+    let lastLabel = "";
+    for (let k = 0; k < n; k++) {
+      const d = lab.dates[i0 + k], y = Math.floor(d / 10000), m = Math.floor(d / 100) % 100;
+      const label = longSpan ? String(y) : `${MONTHS[m - 1]}${m === 1 || k === 0 ? " " + y : ""}`;
+      const key = longSpan ? String(y) : `${y}-${m}`;
+      if (key !== lastLabel) {
+        lastLabel = key;
+        if (longSpan && m > 1 && k > 0) continue;
+        const t = svgEl("text", { x: sx(k), y: plotB + 16, "text-anchor": "start", "font-size": 11, fill: dim });
+        t.textContent = label; svg.append(t);
+      }
     }
-    const xl = svgEl("text", { x: (m.l + W - m.r) / 2, y: H - 6, "text-anchor": "middle", "font-size": 12, fill: dim });
-    xl.textContent = "House size (standardized)"; svg.append(xl);
-    const yl = svgEl("text", { x: 14, y: (m.t + H - m.b) / 2, "text-anchor": "middle", "font-size": 12, fill: dim, transform: `rotate(-90 14 ${(m.t + H - m.b) / 2})` });
-    yl.textContent = "Price ($1000s)"; svg.append(yl);
-
-    // Points: clean rows filled, shocked rows hollow; opacity encodes Huber weight.
-    const pts = svgEl("g", {});
-    for (let i = 0; i < N_TRAIN; i++) {
-      const cy = Math.min(Math.max(sy(y[i]), m.t + 4), H - m.b - 4);
-      const op = (0.25 + 0.75 * hub.w[i]).toFixed(2);
-      const p = shocked[i]
-        ? svgEl("circle", { cx: sx(train.x[i]), cy, r: 4.5, fill: "none", stroke: fg, "stroke-width": 1.4, opacity: op })
-        : svgEl("circle", { cx: sx(train.x[i]), cy, r: 3.5, fill: cssVar("--pt"), stroke: bg, "stroke-width": 1, opacity: op });
-      p.dataset.i = i;
-      pts.append(p);
-    }
-    svg.append(pts);
-
-    // Fitted lines with direct labels.
-    const lines = svgEl("g", { "clip-path": "url(#plotClip)" });
-    [[ols, "--ols"], [hub, "--hub"]].forEach(([b, col]) => {
-      lines.append(svgEl("line", { x1: sx(X0), y1: sy(b.b0 + b.b1 * X0), x2: sx(X1), y2: sy(b.b0 + b.b1 * X1), stroke: cssVar(col), "stroke-width": 2.5, "stroke-linecap": "round" }));
+    // Returns as thin bars.
+    const bars = svgEl("g", { stroke: cssVar("--ret"), "stroke-width": Math.max(0.6, Math.min(2.5, (W - mg.l - mg.r) / n * 0.6)) });
+    for (let k = 0; k < n; k++) bars.append(svgEl("line", { x1: sx(k), x2: sx(k), y1: sy(0), y2: sy(lab.r[i0 + k]) }));
+    svg.append(bars);
+    // VaR lines.
+    series.forEach((s) => {
+      let dpath = "";
+      for (let k = 0; k < n; k++) dpath += `${k ? "L" : "M"}${sx(k).toFixed(1)},${sy(s.v[k]).toFixed(1)}`;
+      svg.append(svgEl("path", { d: dpath, fill: "none", stroke: cssVar(s.color), "stroke-width": 2, "stroke-linejoin": "round" }));
     });
-    svg.append(lines);
-    const yo = ols.b0 + ols.b1 * X1, yh = hub.b0 + hub.b1 * X1;
-    let lo = sy(yo), lh = sy(yh);
-    if (Math.abs(lo - lh) < 14) { const mid = (lo + lh) / 2; lo = mid - 8 * Math.sign(lh - lo || 1); lh = mid + 8 * Math.sign(lh - lo || 1); }
-    [["OLS", lo], ["Huber", lh]].forEach(([name, yy]) => {
-      const t = svgEl("text", { x: W - m.r + 6, y: Math.min(Math.max(yy, m.t + 10), H - m.b) + 4, "font-size": 12, fill: fg });
-      t.textContent = name; svg.append(t);
+    // Breach ticks: one row per model below the axis labels.
+    series.forEach((s, m) => {
+      const y = plotB + 28 + m * 12;
+      const lab0 = svgEl("text", { x: mg.l - 8, y: y + 4, "text-anchor": "end", "font-size": 9, fill: dim });
+      lab0.textContent = ["Naive", "Orig.", "Rev."][m]; svg.append(lab0);
+      svg.append(svgEl("line", { x1: mg.l, x2: W - mg.r, y1: y, y2: y, stroke: grid, "stroke-width": 1 }));
+      for (let k = 0; k < n; k++) if (s.hit[k]) svg.append(svgEl("line", { x1: sx(k), x2: sx(k), y1: y - 5, y2: y + 5, stroke: cssVar(s.color), "stroke-width": 2.5 }));
     });
 
-    // Tooltip on hover.
+    // Hover readout.
     const tip = $("#tip"), wrap = svg.parentElement;
-    pts.querySelectorAll("circle").forEach((p) => {
-      p.style.cursor = "default";
-      p.addEventListener("pointerenter", () => {
-        const i = +p.dataset.i;
-        tip.innerHTML = `<b>${shocked[i] ? "Shocked row" : "Clean row"}</b><br>size ${train.x[i].toFixed(2)} · price ${y[i].toFixed(0)}<br>Huber weight w = ${hub.w[i].toFixed(2)}`;
-        tip.hidden = false;
-        const box = svg.getBoundingClientRect(), wb = wrap.getBoundingClientRect(), scale = box.width / W;
-        const left = box.left - wb.left + (+p.getAttribute("cx")) * scale + 10;
-        tip.style.left = `${Math.min(left, wb.width - 190)}px`;
-        tip.style.top = `${box.top - wb.top + (+p.getAttribute("cy")) * scale - 10}px`;
-      });
-      p.addEventListener("pointerleave", () => { tip.hidden = true; });
+    const overlay = svgEl("rect", { x: mg.l, y: mg.t, width: W - mg.l - mg.r, height: plotB - mg.t, fill: "transparent" });
+    const cursor = svgEl("line", { y1: mg.t, y2: plotB, stroke: fg, "stroke-width": 1, "stroke-dasharray": "3 3", visibility: "hidden" });
+    svg.append(cursor, overlay);
+    overlay.addEventListener("pointermove", (ev) => {
+      const box = svg.getBoundingClientRect(), scale = box.width / W;
+      const k = Math.max(0, Math.min(n - 1, Math.round(((ev.clientX - box.left) / scale - mg.l) / (W - mg.l - mg.r) * n - 0.5)));
+      cursor.setAttribute("x1", sx(k)); cursor.setAttribute("x2", sx(k)); cursor.setAttribute("visibility", "visible");
+      const rr = lab.r[i0 + k];
+      tip.innerHTML = `<b>${fmtDate(lab.dates[i0 + k])}</b> · return ${rr.toFixed(2)}%<br>` +
+        series.map((s) => `${s.label}: ${s.v[k].toFixed(2)}%${s.hit[k] ? " <b>breached</b>" : ""}`).join("<br>");
+      tip.hidden = false;
+      const wb = wrap.getBoundingClientRect(), x = box.left - wb.left + sx(k) * scale;
+      tip.style.left = `${x > wb.width / 2 ? x - 230 : x + 12}px`;
+      tip.style.top = `${box.top - wb.top + 20}px`;
     });
+    overlay.addEventListener("pointerleave", () => { tip.hidden = true; cursor.setAttribute("visibility", "hidden"); });
 
     // Metrics.
-    const card = (label, col, value, sub) =>
-      `<div class="metric"><div class="label">${col ? `<i class="sw ${col}"></i>` : ""}${label}</div><div class="value">${value}</div><div class="sub">${sub}</div></div>`;
-    $("#metrics").innerHTML =
-      card("OLS clean-test RMSE", "ols", rmse(ols, test).toFixed(1), `β̂₁ = ${ols.b1.toFixed(1)} (true 85)`) +
-      card("Huber clean-test RMSE", "hub", rmse(hub, test).toFixed(1), `β̂₁ = ${hub.b1.toFixed(1)} · ${hub.iters} IRLS iters`) +
-      card("Noise floor σ", "", TRUE.sd.toFixed(1), "best achievable RMSE") +
-      card("Rows down-weighted", "", `${Array.from(hub.w).filter((v) => v < 1).length}`, `of ${N_TRAIN} (w < 1); ${k} shocked`);
+    const expected = lv * n;
+    const swatch = { rolling: "naive", "garch-n": "ols", "gjr-t": "hub" };
+    $("#metrics").innerHTML = series.map((s) => {
+      const k = s.hit.reduce((a, b) => a + b, 0);
+      let avg = 0; for (let t = 0; t < n; t++) avg += s.v[t];
+      return `<div class="metric"><div class="label"><i class="sw ${swatch[s.key]}"></i>${s.label}</div>` +
+        `<div class="value">${k} <span class="unit">breaches</span></div>` +
+        `<div class="sub">${(k / n * 100).toFixed(1)}% of days · avg limit ${(avg / n).toFixed(2)}%</div></div>`;
+    }).join("") +
+      `<div class="metric"><div class="label">A perfect ${Math.round(lv * 100)}% model</div><div class="value">≈${expected < 10 ? expected.toFixed(1) : Math.round(expected)}</div>` +
+      `<div class="sub">expected breaches in ${n} trading days</div></div>`;
+    $("#labCaption").textContent = `${periodName}: ${n} trading days. Ticks under the chart mark days whose loss broke each model's ${Math.round(lv * 100)}% limit.` +
+      (lab.period === "gfc" ? " These days were part of the fitting data, so this is not an out-of-sample test." : "");
   }
 
-  ["#cIn", "#fIn", "#dIn"].forEach((s) => $(s).addEventListener("input", drawLab));
-  $("#reseed").addEventListener("click", () => { seed = (seed * 1103515245 + 12345) >>> 0; sampleLab(); drawLab(); });
+  function initLab(csv, res) {
+    const rows = csv.trim().split("\n").slice(1).map((l) => l.split(","));
+    const keep = rows.filter((c) => +c[0] >= res.meta.start);
+    lab.dates = keep.map((c) => +c[0]);
+    lab.r = Float64Array.from(keep, (c) => +c[1] + +c[2]);   // total market return, %
+    lab.models = res.models;
+    lab.sigma.rolling = rollingSigma(lab.r);
+    ["garch-n", "gjr-t"].forEach((k) => { lab.sigma[k] = garchSigma(res.models[k].params, lab.r); });
+    drawLab();
+  }
+  function chipGroup(attr, setter) {
+    document.querySelectorAll(`.chip[data-${attr}]`).forEach((b) => b.addEventListener("click", () => {
+      document.querySelectorAll(`.chip[data-${attr}]`).forEach((x) => x.setAttribute("aria-pressed", x === b ? "true" : "false"));
+      setter(b.dataset[attr]);
+      drawLab();
+    }));
+  }
+  chipGroup("period", (v) => { lab.period = v; });
+  chipGroup("level", (v) => { lab.level = v; });
   if (window.matchMedia) matchMedia("(prefers-color-scheme: dark)").addEventListener("change", drawLab);
-  sampleLab();
-  drawLab();
+  Promise.all([
+    fetch("data/french_daily.csv").then((r) => r.text()),
+    fetch("results/garch_results.json").then((r) => r.json()),
+  ]).then(([csv, res]) => initLab(csv, res)).catch(() => {
+    $("#metrics").innerHTML = `<div class="metric"><div class="sub">Could not load the data. Serve the folder over HTTP (python3 -m http.server).</div></div>`;
+  });
 
   /* ---------------- Code tabs ---------------- */
   const KW = /\b(def|return|import|from|as|for|in|if|else|elif|with|not|and|or|None|True|False|break|class|while|lambda)\b/g;
@@ -368,5 +354,5 @@
     document.querySelectorAll(".tab").forEach((x) => { x.classList.toggle("active", x === t); x.setAttribute("aria-selected", x === t); });
     showCode(t.dataset.file);
   }));
-  showCode("model/baseline.py");
+  showCode("model/garch.py");
 })();

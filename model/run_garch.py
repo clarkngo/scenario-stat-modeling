@@ -74,10 +74,26 @@ def run():
         else:
             gauss = {"mu": mu_train, "nu": np.inf}
             entry["test_neg_loglik_per_day"] = G.predictive_neg_loglik(gauss, r[test], sigma[test])
+        entry["quantiles"] = {}
         for lv in LEVELS:
             q = G.quantile(p, lv) if p else G.norm_ppf(lv)
+            entry["quantiles"][str(lv)] = q
             entry[f"var_{lv}"] = backtest(r, p["mu"] if p else mu_train, sigma, q, test, stress, lv)
         out["models"][name] = entry
+
+    # Summary statistics of the data, for the paper's data section.
+    out["data_stats"] = {}
+    for name, m in (("train", train), ("test", test)):
+        x = r[m]
+        z = (x - x.mean()) / x.std()
+        out["data_stats"][name] = {
+            "days": int(m.sum()), "mean": float(x.mean()), "sd": float(x.std()),
+            "ann_vol": float(x.std() * np.sqrt(252)), "skew": float(np.mean(z ** 3)),
+            "kurtosis": float(np.mean(z ** 4)), "min": float(x.min()), "min_date": int(dates[m][x.argmin()]),
+            "max": float(x.max()), "max_date": int(dates[m][x.argmax()]),
+            "beyond_4sd": float(np.mean(np.abs(z) > 4)),
+            "ac1_r": float(np.corrcoef(x[:-1], x[1:])[0, 1]),
+            "ac1_r2": float(np.corrcoef(x[:-1] ** 2, x[1:] ** 2)[0, 1])}
 
     # Series for figures: the 2020 window and the fitted news-impact curves.
     w = (dates >= 20191001) & (dates < 20210101)
