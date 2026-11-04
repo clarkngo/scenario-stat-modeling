@@ -44,7 +44,7 @@ button { font: inherit; cursor: pointer; }
 }
 .brand { font-weight: 700; color: var(--fg); text-decoration: none; }
 .toplinks { display: flex; gap: 16px; align-items: center; font-size: 14px; }
-.toplinks a { color: var(--fg-dim); text-decoration: none; }
+.toplinks a { color: var(--fg-dim); text-decoration: none; white-space: nowrap; }
 .toplinks a:hover { color: var(--fg); }
 
 .layout { display: grid; grid-template-columns: 240px minmax(0, 1fr); gap: 40px; max-width: 1180px; margin: 0 auto; padding: 0 24px; }
@@ -132,4 +132,4 @@ pre.code { background: var(--code-bg); border: 1px solid var(--border); border-r
   .topbar { padding: 10px 16px; }
   .brand { font-size: 14px; }
 }
-@media (max-width: 480px) { .toplinks a[href^="https"] { display: none; } }
+@media (max-width: 480px) { .toplinks a[href^="https"], .toplinks a[href="#code"] { display: none; } }
