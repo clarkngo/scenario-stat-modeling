@@ -74,12 +74,13 @@ def build(out):
     prs = Presentation()
     prs.slide_width, prs.slide_height = W, H
 
-    a = paper["author"]
+    a = paper["affiliation"]
+    names = " & ".join(au["name"] for au in paper["authors"])
     s = blank(prs, a["course"])
     text(s, paper["short_title"], MARGIN, Inches(2.2), Inches(11.7), Inches(1.2), 48, FG, True)
     text(s, "An AI-guided framework for deriving and revising algorithmic baselines from scratch",
          MARGIN, Inches(3.5), Inches(11), Inches(1), 22, DIM)
-    text(s, f"{a['name']} — {a['program']}, {a['university']}", MARGIN, Inches(5.6),
+    text(s, f"{names} — {a['program']}, {a['university']}", MARGIN, Inches(5.6),
          Inches(11), Inches(0.5), 16, DIM)
 
     s = blank(prs, "Framework", "Derive → Implement → Shock → Diagnose → Revise")

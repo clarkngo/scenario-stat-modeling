@@ -4,10 +4,19 @@ Layout: single-column title block and abstract, two-column body, numbered
 ALL-CAPS section headings, APA-style "Table n"/"Figure n" labels, hanging-indent
 references, and single-column appendices on a new page.
 
-Usage:  python3 tools/build_docx.py      ->  build/scenario-stat-modeling.docx
+Drafts: sections and references in paper/content.json each carry a "stage"
+(1 = Draft 1, 2 = Draft 2, 3 = Final Paper). Draft 1 is front matter only:
+title block, abstract, keywords, and the stage-1 references. From Draft 2 on,
+the two-column body is included; sections due in a later stage are rendered as
+a heading plus a "to be completed" note listing their planned subsections.
+
+Usage:  python3 tools/build_docx.py [--stage N]
+        ->  build/scenario-stat-modeling-draft1.docx (stage defaults to content.json "draft.stage")
 """
+import argparse
 import json
 import os
+import re
 
 from docx import Document
 from docx.enum.section import WD_SECTION
@@ -55,6 +64,16 @@ def shade(cell, hex_fill):
     tc_pr.append(shd)
 
 
+def add_marked_runs(p, text, size=None):
+    """Add text to paragraph p, italicizing *spans* (used for APA reference titles)."""
+    for k, chunk in enumerate(re.split(r"\*", text)):
+        if chunk:
+            r = p.add_run(chunk)
+            r.italic = k % 2 == 1
+            if size:
+                r.font.size = Pt(size)
+
+
 def para(doc, text="", size=10, bold=False, italic=False, align=None, before=0, after=8,
          font=FONT, keep_next=False):
     p = doc.add_paragraph()
@@ -70,8 +89,9 @@ def para(doc, text="", size=10, bold=False, italic=False, align=None, before=0, 
 
 
 class Builder:
-    def __init__(self, paper, results):
-        self.paper, self.results = paper, results
+    def __init__(self, paper, results, stage):
+        self.paper, self.results, self.stage = paper, results, stage
+        self.labels = paper["draft"]["labels"]
         self.doc = Document()
         self.n_table = self.n_fig = self.n_eq = 0
         st = self.doc.styles["Normal"]
@@ -81,12 +101,19 @@ class Builder:
         sec.page_width, sec.page_height = Inches(8.5), Inches(11)
         for side in ("left_margin", "right_margin", "top_margin", "bottom_margin"):
             setattr(sec, side, Inches(1))
+        # Draft marker in the page header so circulated copies are never confused.
+        hp = sec.header.paragraphs[0]
+        hp.alignment = WD_ALIGN_PARAGRAPH.RIGHT
+        hr = hp.add_run(f"{self.labels[str(stage)]} · {paper['short_title']}")
+        hr.font.size, hr.font.color.rgb = Pt(8), RGBColor(0x80, 0x80, 0x80)
 
     # --- front matter -------------------------------------------------------
     def title_block(self):
-        p, a = self.paper, self.paper["author"]
+        p, a = self.paper, self.paper["affiliation"]
         para(self.doc, p["title"], size=18, align=WD_ALIGN_PARAGRAPH.CENTER, after=18)
-        for line in (a["name"], a["course"], a["program"], a["school"], a["university"], a["email"]):
+        names = [au["name"] for au in p["authors"]]
+        emails = [au["email"] for au in p["authors"]]
+        for line in names + [a["course"], a["program"], a["school"], a["university"]] + emails:
             para(self.doc, line, size=12, align=WD_ALIGN_PARAGRAPH.CENTER, after=0)
         para(self.doc, "Abstract", size=13, bold=True, align=WD_ALIGN_PARAGRAPH.CENTER,
              before=16, after=8)
@@ -131,6 +158,15 @@ class Builder:
         elif t == "figure":
             self.figure(b)
 
+    def pending(self, s):
+        """Placeholder for a section written in a later draft."""
+        para(self.doc, f"[To be completed in {self.labels[str(s['stage'])]}.]", italic=True,
+             after=4)
+        planned = [b["text"] for b in s["blocks"] if b["type"] == "h3"]
+        if planned:
+            para(self.doc, "Planned subsections: " + "; ".join(planned) + ".", italic=True,
+                 size=9, after=10).runs[0].font.color.rgb = RGBColor(0x60, 0x60, 0x60)
+
     def table(self, b):
         self.n_table += 1
         header, rows = (results_table(self.results) if b.get("source") == "results"
@@ -159,10 +195,12 @@ class Builder:
         para(self.doc, b["caption"], italic=True, size=9, after=10)
 
     # --- back matter --------------------------------------------------------
-    def references(self, number):
-        self.heading(f"{number}. References")
-        for ref in sorted(self.paper["references"]):
-            rp = para(self.doc, ref, size=9, after=6)
+    def references(self, number=None):
+        self.heading(f"{number}. References" if number else "References")
+        refs = [r["text"] for r in self.paper["references"] if r["stage"] <= self.stage]
+        for ref in sorted(refs, key=str.lower):
+            rp = para(self.doc, after=6)
+            add_marked_runs(rp, ref, size=9)
             rp.paragraph_format.left_indent = Inches(0.3)
             rp.paragraph_format.first_line_indent = Inches(-0.3)
 
@@ -182,14 +220,24 @@ class Builder:
 
     def build(self, out):
         self.title_block()
+        if self.stage == 1:  # Draft 1 is front matter plus references only
+            self.references()
+            return self.save(out)
         body = self.doc.add_section(WD_SECTION.CONTINUOUS)
         set_columns(body, 2)
         for s in self.paper["sections"]:
             self.heading(f"{s['number']}. {s['title']}")
+            if s.get("stage", 1) > self.stage:
+                self.pending(s)
+                continue
             for b in s["blocks"]:
                 self.block(b)
         self.references(len(self.paper["sections"]) + 1)
-        self.appendix()
+        if self.stage >= 3:  # code appendices ship with the final paper
+            self.appendix()
+        return self.save(out)
+
+    def save(self, out):
         os.makedirs(os.path.dirname(out), exist_ok=True)
         self.doc.save(out)
         return out
@@ -197,5 +245,10 @@ class Builder:
 
 if __name__ == "__main__":
     paper, results = load()
-    out = Builder(paper, results).build(os.path.join(ROOT, "build", "scenario-stat-modeling.docx"))
+    ap = argparse.ArgumentParser(description=__doc__.split("\n")[0])
+    ap.add_argument("--stage", type=int, choices=[1, 2, 3], default=paper["draft"]["stage"])
+    stage = ap.parse_args().stage
+    name = "final" if stage == 3 else f"draft{stage}"
+    out = Builder(paper, results, stage).build(
+        os.path.join(ROOT, "build", f"scenario-stat-modeling-{name}.docx"))
     print("wrote", os.path.relpath(out, ROOT))
