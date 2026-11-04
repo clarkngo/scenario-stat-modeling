@@ -1,0 +1,1564 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>GARCH Defense Guide</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Spectral:wght@500;600;700&family=Public+Sans:ital,wght@0,400;0,500;0,600;0,700;1,400&family=JetBrains+Mono:wght@400;500&display=swap">
+<script>
+  window.MathJax = { tex: { inlineMath: [["\\(", "\\)"]], displayMath: [["\\[", "\\]"]] }, svg: { fontCache: "global" } };
+</script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/mathjax/3.2.2/es5/tex-svg.min.js" defer></script>
+<style>
+  /* Layout: a study binder. Sticky contents rail on the left (desktop), one reading column;
+     original model = blue, revised model = orange, a breach/loss = red. */
+  :root {
+    --paper: #f4f6f8;
+    --card: #ffffff;
+    --ink: #131c27;
+    --muted: #586474;
+    --line: #dce1e8;
+    --orig: #2a6fc9;
+    --rev: #c9561c;
+    --loss: #b8322a;
+    --good: #2f7d4f;
+    --tint: #e9eef5;
+    --display: "Spectral", Georgia, "Times New Roman", serif;
+    --body: "Public Sans", system-ui, -apple-system, "Segoe UI", sans-serif;
+    --mono: "JetBrains Mono", ui-monospace, "SF Mono", Menlo, monospace;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --paper: #0e141b; --card: #151e28; --ink: #e5eaf0; --muted: #9ba7b6; --line: #273443;
+      --orig: #6aa6f2; --rev: #f0925e; --loss: #f07a70; --good: #6cc492; --tint: #1b2633;
+      color-scheme: dark;
+    }
+  }
+  :root[data-theme="dark"] {
+    --paper: #0e141b; --card: #151e28; --ink: #e5eaf0; --muted: #9ba7b6; --line: #273443;
+    --orig: #6aa6f2; --rev: #f0925e; --loss: #f07a70; --good: #6cc492; --tint: #1b2633;
+    color-scheme: dark;
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; }
+  [hidden] { display: none !important; }
+  body { background: var(--paper); color: var(--ink); font: 400 16px/1.6 var(--body); }
+  .wrap {
+    max-width: 1180px; margin: 0 auto;
+    padding-left: max(16px, env(safe-area-inset-left, 0px));
+    padding-right: max(16px, env(safe-area-inset-right, 0px));
+    padding-block: 0 72px;
+  }
+  a { color: var(--orig); }
+  :focus-visible { outline: 2px solid var(--orig); outline-offset: 2px; border-radius: 3px; }
+  h1, h2, h3 { font-family: var(--display); text-wrap: balance; line-height: 1.15; margin: 0; }
+  h1 { font-size: clamp(2.1rem, 5vw, 3.3rem); font-weight: 700; letter-spacing: -0.01em; }
+  h2 { font-size: clamp(1.55rem, 3vw, 2rem); font-weight: 600; }
+  h3 { font-size: 1.2rem; font-weight: 600; }
+  p { margin: 0; }
+  .eyebrow { font: 600 0.72rem/1 var(--body); letter-spacing: 0.12em; text-transform: uppercase; color: var(--muted); }
+  .mono { font-family: var(--mono); font-size: 0.88em; }
+  .num { font-variant-numeric: tabular-nums; }
+  .o { color: var(--orig); font-weight: 600; }
+  .r { color: var(--rev); font-weight: 600; }
+  .x { color: var(--loss); font-weight: 600; }
+
+  /* ticker tape: real extreme days from the data */
+  .tape {
+    border-bottom: 1px solid var(--line); background: var(--card);
+    padding-left: max(16px, env(safe-area-inset-left, 0px));
+    padding-right: max(16px, env(safe-area-inset-right, 0px));
+    padding-block: 8px; overflow-x: auto; white-space: nowrap;
+    font: 500 0.78rem/1.4 var(--mono); color: var(--muted);
+  }
+  .tape span { margin-right: 22px; }
+  .tape b { font-weight: 500; }
+  .tape .dn { color: var(--loss); }
+  .tape .up { color: var(--good); }
+
+  header.hero { padding-block: 44px 28px; display: grid; gap: 14px; max-width: 760px; }
+  header.hero .lede { font-size: 1.12rem; color: var(--muted); max-width: 64ch; }
+  .meta { display: flex; flex-wrap: wrap; gap: 8px 18px; font-size: 0.86rem; color: var(--muted); }
+
+  .layout { display: grid; grid-template-columns: 220px minmax(0, 1fr); gap: 48px; align-items: start; }
+  nav.toc { position: sticky; top: calc(env(safe-area-inset-top, 0px) + 20px); font-size: 0.88rem; }
+  nav.toc ol { list-style: none; margin: 10px 0 0; padding: 0; display: grid; gap: 2px; counter-reset: toc; }
+  nav.toc li { counter-increment: toc; }
+  nav.toc a { display: block; padding: 5px 10px; border-radius: 6px; color: var(--ink); text-decoration: none; }
+  nav.toc a::before { content: counter(toc) "  "; font-family: var(--mono); color: var(--muted); font-size: 0.8em; }
+  nav.toc a:hover { background: var(--tint); }
+  main { min-width: 0; display: grid; gap: 64px; }
+  section { display: grid; gap: 18px; scroll-margin-top: 20px; min-width: 0; }
+  .sec-head { display: grid; gap: 8px; border-top: 2px solid var(--ink); padding-top: 14px; }
+  .sec-head p { color: var(--muted); max-width: 68ch; }
+  .prose { max-width: 70ch; display: grid; gap: 12px; }
+
+  /* pitch script */
+  .pitch { background: var(--card); border: 1px solid var(--line); border-radius: 10px; padding: 22px 24px; display: grid; gap: 12px; }
+  .pitch ol { margin: 0; padding-left: 1.3em; display: grid; gap: 10px; }
+  .pitch li::marker { font-family: var(--mono); color: var(--muted); }
+  .say { font-family: var(--display); font-size: 1.12rem; line-height: 1.5; }
+
+  /* four ideas */
+  .ideas { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 14px; }
+  .idea { background: var(--card); border: 1px solid var(--line); border-radius: 10px; padding: 18px; display: grid; gap: 8px; align-content: start; }
+  .idea .tag { font: 500 0.75rem/1 var(--mono); color: var(--muted); }
+  .idea .ev { font-size: 0.9rem; color: var(--muted); border-top: 1px dashed var(--line); padding-top: 8px; }
+
+  /* simulator */
+  .sim { background: var(--card); border: 1px solid var(--line); border-radius: 10px; padding: 22px; display: grid; gap: 18px; }
+  .controls { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 18px; }
+  .ctl { display: grid; gap: 6px; }
+  .ctl label { font-weight: 600; font-size: 0.92rem; display: flex; justify-content: space-between; gap: 8px; }
+  .ctl output { font-family: var(--mono); font-weight: 500; }
+  .ctl small { color: var(--muted); font-size: 0.8rem; }
+  input[type=range] { width: 100%; accent-color: var(--ink); }
+  .presets { display: flex; flex-wrap: wrap; gap: 8px; }
+  button.chip, .chip {
+    font: 500 0.82rem/1 var(--body); padding: 8px 12px; border-radius: 999px; cursor: pointer;
+    border: 1px solid var(--line); background: var(--paper); color: var(--ink);
+  }
+  button.chip[aria-pressed="true"] { background: var(--ink); color: var(--paper); border-color: var(--ink); }
+  .bars { display: grid; gap: 14px; }
+  .bar-row { display: grid; grid-template-columns: 150px minmax(0, 1fr) 92px; gap: 10px; align-items: center; font-size: 0.9rem; }
+  .track { height: 16px; background: var(--tint); border-radius: 4px; position: relative; overflow: hidden; }
+  .fill { position: absolute; inset: 0 auto 0 0; border-radius: 4px; transition: width 0.25s ease; }
+  .fill.o { background: var(--orig); }
+  .fill.r { background: var(--rev); }
+  .bar-val { font-family: var(--mono); text-align: right; }
+  .readout { font-size: 0.95rem; background: var(--tint); border-radius: 8px; padding: 12px 14px; }
+
+  /* glossary */
+  .gtools { display: grid; gap: 12px; position: sticky; top: env(safe-area-inset-top, 0px); background: var(--paper); padding-block: 10px; z-index: 2; }
+  .search { width: 100%; font: 400 1rem var(--body); padding: 11px 14px; border-radius: 8px; border: 1px solid var(--line); background: var(--card); color: var(--ink); }
+  .cats { display: flex; flex-wrap: wrap; gap: 8px; }
+  .count { font-size: 0.82rem; color: var(--muted); }
+  .glist { display: grid; gap: 28px; }
+  .group { display: grid; gap: 10px; }
+  .group > h3 { font-size: 1.05rem; color: var(--muted); font-family: var(--body); font-weight: 600; letter-spacing: 0.02em; }
+  .term { background: var(--card); border: 1px solid var(--line); border-radius: 10px; padding: 16px 18px; display: grid; gap: 10px; min-width: 0; }
+  .term h4 { margin: 0; font: 600 1.08rem/1.3 var(--display); }
+  .term h4 .aka { font: 400 0.8rem var(--body); color: var(--muted); margin-left: 6px; }
+  .term .plain { font-size: 1rem; }
+  .facets { display: grid; grid-template-columns: 112px minmax(0, 1fr); gap: 6px 14px; font-size: 0.92rem; margin: 0; }
+  .facets dt { font: 600 0.7rem/1.9 var(--body); letter-spacing: 0.09em; text-transform: uppercase; color: var(--muted); }
+  .facets dd { margin: 0; min-width: 0; overflow-x: auto; }
+  .facets dd.ask { font-style: italic; }
+  .nohits { color: var(--muted); }
+
+  /* tables */
+  .tbl { overflow-x: auto; border: 1px solid var(--line); border-radius: 10px; background: var(--card); }
+  table { border-collapse: collapse; width: 100%; font-size: 0.9rem; font-variant-numeric: tabular-nums; }
+  th, td { padding: 9px 12px; text-align: right; border-bottom: 1px solid var(--line); white-space: nowrap; }
+  th:first-child, td:first-child { text-align: left; }
+  thead th { font: 600 0.72rem/1.3 var(--body); letter-spacing: 0.06em; text-transform: uppercase; color: var(--muted); background: var(--tint); }
+  tbody tr:last-child td { border-bottom: 0; }
+  tr.is-o td:first-child { box-shadow: inset 3px 0 0 var(--orig); }
+  tr.is-r td:first-child { box-shadow: inset 3px 0 0 var(--rev); }
+  td.fail { color: var(--loss); }
+  td.pass { color: var(--good); }
+  .read { font-size: 0.93rem; color: var(--muted); max-width: 72ch; }
+  .note { border-left: 3px solid var(--line); padding: 4px 0 4px 14px; color: var(--muted); font-size: 0.93rem; max-width: 72ch; }
+
+  /* Q&A */
+  .qa { display: grid; gap: 8px; }
+  details { background: var(--card); border: 1px solid var(--line); border-radius: 10px; }
+  summary { cursor: pointer; padding: 14px 18px; font-weight: 600; list-style: none; display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 12px; }
+  summary::-webkit-details-marker { display: none; }
+  summary::after { content: "+"; font-family: var(--mono); color: var(--muted); }
+  details[open] summary::after { content: "−"; }
+  summary .lvl { font: 500 0.72rem/1.9 var(--mono); color: var(--muted); grid-column: 1; }
+  .ans { padding: 0 18px 16px; display: grid; gap: 10px; max-width: 74ch; }
+  .ans ul { margin: 0; padding-left: 1.2em; display: grid; gap: 4px; }
+  .qa-tools { display: flex; gap: 8px; flex-wrap: wrap; }
+
+  /* say / avoid */
+  .pairs { display: grid; gap: 8px; }
+  .pair { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 0; border: 1px solid var(--line); border-radius: 10px; overflow: hidden; background: var(--card); font-size: 0.93rem; }
+  .pair > div { padding: 12px 14px; }
+  .pair .no { border-right: 1px solid var(--line); color: var(--muted); }
+  .pair .no::before { content: "Avoid  "; font: 600 0.68rem var(--body); letter-spacing: 0.08em; color: var(--loss); }
+  .pair .yes::before { content: "Say  "; font: 600 0.68rem var(--body); letter-spacing: 0.08em; color: var(--good); }
+
+  /* formulas */
+  .formulas { display: grid; gap: 10px; }
+  .f { background: var(--card); border: 1px solid var(--line); border-radius: 10px; padding: 14px 18px; display: grid; grid-template-columns: 210px minmax(0, 1fr); gap: 14px; align-items: center; }
+  .f .fname { font-weight: 600; font-size: 0.92rem; }
+  .f .fname small { display: block; font-weight: 400; color: var(--muted); }
+  .f .fmath { overflow-x: auto; min-width: 0; }
+
+  /* references */
+  .refs { display: grid; gap: 8px; }
+  .ref { display: grid; grid-template-columns: 210px minmax(0, 1fr); gap: 14px; padding: 10px 0; border-bottom: 1px solid var(--line); font-size: 0.93rem; }
+  .ref b { font-weight: 600; }
+
+  /* flashcards */
+  .card-q { background: var(--card); border: 1px solid var(--line); border-radius: 12px; padding: 26px; display: grid; gap: 14px; min-height: 220px; align-content: start; }
+  .card-q .front { font: 600 1.6rem/1.2 var(--display); }
+  .card-q .back { display: grid; gap: 8px; border-top: 1px dashed var(--line); padding-top: 12px; }
+  .card-actions { display: flex; flex-wrap: wrap; gap: 8px; }
+  button.btn { font: 600 0.9rem var(--body); padding: 10px 16px; border-radius: 8px; border: 1px solid var(--ink); background: var(--ink); color: var(--paper); cursor: pointer; }
+  button.btn.ghost { background: transparent; color: var(--ink); }
+  .score { font-size: 0.85rem; color: var(--muted); }
+
+  @media (max-width: 900px) {
+    .layout { grid-template-columns: minmax(0, 1fr); gap: 28px; }
+    nav.toc { position: static; }
+    nav.toc ol { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  }
+  @media (max-width: 640px) {
+    .ideas, .controls { grid-template-columns: minmax(0, 1fr); }
+    .facets { grid-template-columns: minmax(0, 1fr); gap: 2px; }
+    .facets dd { margin-bottom: 6px; }
+    .bar-row { grid-template-columns: minmax(0, 1fr) 84px; }
+    .bar-row .track { grid-column: 1 / -1; grid-row: 2; }
+    .f, .ref { grid-template-columns: minmax(0, 1fr); gap: 6px; }
+    .pair { grid-template-columns: minmax(0, 1fr); }
+    .pair .no { border-right: 0; border-bottom: 1px solid var(--line); }
+    nav.toc ol { grid-template-columns: minmax(0, 1fr); }
+  }
+  @media (prefers-reduced-motion: reduce) { .fill { transition: none; } }
+</style>
+</head>
+<body>
+<div class="tape" aria-label="Extreme days in our data">
+  <span>EXTREME DAYS, US MARKET 1990–2026:</span>
+  <span><b>2020-03-16</b> <span class="dn">−12.00%</span></span>
+  <span><b>2008-10-13</b> <span class="up">+11.36%</span></span>
+  <span><b>2025-04-09</b> <span class="up">+9.67%</span></span>
+  <span><b>2008-12-01</b> <span class="dn">−8.96%</span></span>
+  <span>typical day ≈ ±1.1%</span>
+  <span>days beyond 4 standard deviations: <b>0.60%</b> observed vs <b>0.006%</b> if returns were normal</span>
+</div>
+
+<div class="wrap">
+  <header class="hero">
+    <span class="eyebrow">DS 623 · Study guide for the presentation</span>
+    <h1>GARCH Defense Guide</h1>
+    <p class="lede">Every term in <em>Forecasting Market Risk from Scratch</em>, explained plainly, tied to our own numbers, with the questions a reviewer is likely to ask and how to answer them. Story first, math last.</p>
+    <div class="meta">
+      <span>Clark Jason Ngo &amp; Manas Teja Katakam</span>
+      <span>Data: Kenneth R. French Data Library, daily, 1990-01-02 to 2026-08-31</span>
+      <span>Code: NumPy only</span>
+      <span><a href="../index.html">Research portal</a> · <a href="ds623-scenario-stat-modeling.html">Slides</a></span>
+    </div>
+  </header>
+
+  <div class="layout">
+    <nav class="toc" aria-label="Contents">
+      <span class="eyebrow">Contents</span>
+      <ol>
+        <li><a href="#pitch">The paper in one minute</a></li>
+        <li><a href="#ideas">Four ideas to own</a></li>
+        <li><a href="#feel">Feel the model</a></li>
+        <li><a href="#glossary">Glossary</a></li>
+        <li><a href="#numbers">Our numbers, explained</a></li>
+        <li><a href="#questions">Tough questions</a></li>
+        <li><a href="#words">Say this, not that</a></li>
+        <li><a href="#formulas">Formula sheet</a></li>
+        <li><a href="#sources">Who said what</a></li>
+        <li><a href="#drill">Flashcard drill</a></li>
+      </ol>
+    </nav>
+
+    <main>
+      <!-- 1 -->
+      <section id="pitch">
+        <div class="sec-head">
+          <span class="eyebrow">Section 1</span>
+          <h2>The paper in one minute</h2>
+          <p>If you remember nothing else, be able to say these five sentences out loud without notes.</p>
+        </div>
+        <div class="pitch">
+          <ol>
+            <li class="say">After a calm stretch, people assume tomorrow will be calm too. Markets don't work that way: turbulent days cluster, and big losses come far more often than a bell curve says.</li>
+            <li class="say">Banks summarize this risk with <strong>Value-at-Risk</strong>: a loss they expect to exceed on only 1 day in 100 (or 5 in 100).</li>
+            <li class="say">Our <span class="o">original model</span>, GARCH(1,1), updates tomorrow's risk from yesterday's surprise and yesterday's risk, and assumes a bell curve.</li>
+            <li class="say">Our <span class="r">revised model</span>, GJR-GARCH with Student-t errors, fixes two wrong assumptions: it lets bad days raise risk more than good days, and it allows crash-sized moves.</li>
+            <li class="say">We built both from scratch in NumPy, fitted them on 1990–2014, and tested them on 2015–2026. The revised model fits unseen data better and was caught off guard far less often in the 2020 crash.</li>
+          </ol>
+        </div>
+        <p class="note">Draft 1's abstract is written as a plan and states no results. The numbers on this page come from our working prototype (<span class="mono">results/garch_results.md</span>), so they may change slightly before the final paper.</p>
+      </section>
+
+      <!-- 2 -->
+      <section id="ideas">
+        <div class="sec-head">
+          <span class="eyebrow">Section 2</span>
+          <h2>Four ideas to own</h2>
+          <p>Each one is a plain observation about markets, then the technical name for it, then the evidence from our own data.</p>
+        </div>
+        <div class="ideas">
+          <div class="idea">
+            <span class="tag">Volatility clustering</span>
+            <h3>Rough days come in bunches</h3>
+            <p>A wild day is usually followed by more wild days, and calm by calm. You can't predict whether tomorrow is up or down, but you can predict whether it will be <em>big</em>.</p>
+            <p class="ev">Our data: today's return barely predicts tomorrow's (correlation −0.03 in training), but today's <em>squared</em> return does (0.21 in training, 0.44 in the test period).</p>
+          </div>
+          <div class="idea">
+            <span class="tag">Heavy tails</span>
+            <h3>Crashes are not once-in-a-universe events</h3>
+            <p>A bell curve says a 4-standard-deviation day should happen about once every 60 years. The US market does it about one and a half times a year.</p>
+            <p class="ev">Our data: 0.60% of days moved beyond 4 standard deviations, about 95 times the 0.006% a normal curve allows. Kurtosis is 11.3 in training and 16.7 in testing (a bell curve has 3).</p>
+          </div>
+          <div class="idea">
+            <span class="tag">Leverage effect / asymmetry</span>
+            <h3>Fear is louder than greed</h3>
+            <p>A 3% drop makes markets much more nervous than a 3% rise. Same size of move, different reaction.</p>
+            <p class="ev">Our fit: the revised model's reaction to good surprises (α) is 0.001, essentially zero; its extra reaction to bad surprises (γ) is 0.141. After a −3% day it predicts 1.51% volatility; after a +3% day, 1.00%.</p>
+          </div>
+          <div class="idea">
+            <span class="tag">Persistence / mean reversion</span>
+            <h3>Storms fade, slowly</h3>
+            <p>After a shock, risk stays high for a while and then drifts back toward a normal level. It doesn't snap back overnight.</p>
+            <p class="ev">Our fit: persistence ≈ 0.99, so half of any shock to risk has faded after about 64–67 trading days (roughly three months).</p>
+          </div>
+        </div>
+      </section>
+
+      <!-- 3 -->
+      <section id="feel">
+        <div class="sec-head">
+          <span class="eyebrow">Section 3</span>
+          <h2>Feel the model</h2>
+          <p>This uses the exact parameters we fitted on 1990–2014. Pick today's market move and today's risk level, and see what each model expects for tomorrow. Try a −3% day and then a +3% day.</p>
+        </div>
+        <div class="sim">
+          <div class="presets" role="group" aria-label="Scenarios">
+            <button class="chip" type="button" data-e="0" data-s="1.05">Ordinary day</button>
+            <button class="chip" type="button" data-e="-3" data-s="1.05">Calm market, −3% shock</button>
+            <button class="chip" type="button" data-e="3" data-s="1.05">Calm market, +3% rally</button>
+            <button class="chip" type="button" data-e="-12" data-s="4.5">Mar 16, 2020 (−12%)</button>
+          </div>
+          <div class="controls">
+            <div class="ctl">
+              <label for="shock">Today's surprise move <output id="shockOut">−3.0%</output></label>
+              <input id="shock" type="range" min="-12" max="12" step="0.1" value="-3">
+              <small>The return minus its average (\(e_t\)). Negative = a bad day.</small>
+            </div>
+            <div class="ctl">
+              <label for="sig">Today's predicted volatility <output id="sigOut">1.05%</output></label>
+              <input id="sig" type="range" min="0.5" max="6" step="0.05" value="1.05">
+              <small>What the model expected today (\(\sigma_t\)). Long-run level ≈ 1.05%.</small>
+            </div>
+          </div>
+          <div class="bars" aria-live="polite">
+            <div class="bar-row"><span class="o">Original: tomorrow's volatility</span><div class="track"><div class="fill o" id="b1"></div></div><span class="bar-val" id="v1"></span></div>
+            <div class="bar-row"><span class="r">Revised: tomorrow's volatility</span><div class="track"><div class="fill r" id="b2"></div></div><span class="bar-val" id="v2"></span></div>
+            <div class="bar-row"><span class="o">Original: 1% VaR (loss limit)</span><div class="track"><div class="fill o" id="b3"></div></div><span class="bar-val" id="v3"></span></div>
+            <div class="bar-row"><span class="r">Revised: 1% VaR (loss limit)</span><div class="track"><div class="fill r" id="b4"></div></div><span class="bar-val" id="v4"></span></div>
+          </div>
+          <p class="readout" id="readout"></p>
+        </div>
+        <p class="read">How the numbers are made: tomorrow's variance = ω + (α + γ·[today was bad]) × surprise² + β × today's variance. The loss limit is average return + (1% quantile) × tomorrow's volatility, where the quantile is −2.326 for the bell curve and −2.509 for the fitted Student-t (ν ≈ 8).</p>
+      </section>
+
+      <!-- 4 -->
+      <section id="glossary">
+        <div class="sec-head">
+          <span class="eyebrow">Section 4</span>
+          <h2>Glossary</h2>
+          <p>Each entry has four parts: what it means in plain words, where it shows up in our paper, the math (if any), and a one-line answer if someone asks about it.</p>
+        </div>
+        <div class="gtools">
+          <input class="search" id="q" type="search" placeholder="Search terms, e.g. persistence, Kupiec, kurtosis" aria-label="Search the glossary">
+          <div class="cats" role="group" aria-label="Filter by topic">
+            <button class="chip" type="button" data-cat="all" aria-pressed="true">All</button>
+            <button class="chip" type="button" data-cat="data" aria-pressed="false">Data &amp; returns</button>
+            <button class="chip" type="button" data-cat="risk" aria-pressed="false">Risk &amp; volatility</button>
+            <button class="chip" type="button" data-cat="dist" aria-pressed="false">Distributions</button>
+            <button class="chip" type="button" data-cat="model" aria-pressed="false">The models</button>
+            <button class="chip" type="button" data-cat="fit" aria-pressed="false">Fitting</button>
+            <button class="chip" type="button" data-cat="test" aria-pressed="false">Testing</button>
+          </div>
+          <span class="count" id="count"></span>
+        </div>
+
+        <div class="glist" id="glist">
+          <!-- DATA -->
+          <div class="group" data-group="data">
+            <h3>Data &amp; returns</h3>
+
+            <article class="term" data-cat="data">
+              <h4>Daily return <span class="aka">also: simple return, percent return</span></h4>
+              <p class="plain">How much the market's value changed from one day's close to the next, as a percentage. +1.2 means the market rose 1.2% that day.</p>
+              <dl class="facets">
+                <dt>In our paper</dt><dd>Our \(r_t\). We use the total US market return in percent, built as Mkt-RF + RF from the French data. 9,233 trading days from 1990-01-02 to 2026-08-31.</dd>
+                <dt>Math</dt><dd>\( r_t = 100 \times \dfrac{P_t - P_{t-1}}{P_{t-1}} \)</dd>
+                <dt>If asked</dt><dd class="ask">"We model daily percentage returns. Working in percent keeps the numbers near 1 instead of 0.0001, which helps the optimizer."</dd>
+              </dl>
+            </article>
+
+            <article class="term" data-cat="data">
+              <h4>Simple vs. log return</h4>
+              <p class="plain">Two ways to measure a day's change. A simple return is the percent change; a log return is the natural log of the price ratio. For daily moves of a percent or two they are almost identical.</p>
+              <dl class="facets">
+                <dt>In our paper</dt><dd>We use simple returns because that is what the French library publishes. Many GARCH papers use log returns; the choice barely matters at daily frequency.</dd>
+                <dt>Math</dt><dd>\( \ln(1 + x) \approx x \) when \(x\) is small, e.g. \( \ln(1.01) = 0.00995 \)</dd>
+                <dt>If asked</dt><dd class="ask">"At daily frequency the difference is in the third decimal place, so it doesn't change any conclusion."</dd>
+              </dl>
+            </article>
+
+            <article class="term" data-cat="data">
+              <h4>Market excess return (Mkt-RF)</h4>
+              <p class="plain">The market's return minus the return on a risk-free Treasury bill. It's what investors earn for taking stock-market risk.</p>
+              <dl class="facets">
+                <dt>In our paper</dt><dd>The French library publishes Mkt-RF. We add RF back to get the total market return, because Value-at-Risk is about the actual loss on the portfolio.</dd>
+                <dt>If asked</dt><dd class="ask">"Daily RF is about 0.01%, so adding it back has almost no effect on volatility; it just keeps the return honest."</dd>
+              </dl>
+            </article>
+
+            <article class="term" data-cat="data">
+              <h4>Risk-free rate (RF)</h4>
+              <p class="plain">The return on a very safe short-term US government bill. The French library uses the one-month Treasury bill.</p>
+              <dl class="facets">
+                <dt>In our paper</dt><dd>Added to Mkt-RF to form the total return. Tiny on a daily basis.</dd>
+              </dl>
+            </article>
+
+            <article class="term" data-cat="data">
+              <h4>Kenneth R. French Data Library</h4>
+              <p class="plain">A free, widely used research data set run by Professor Kenneth French at Dartmouth's Tuck School of Business. Its market return covers all US stocks listed on the NYSE, AMEX and NASDAQ (from CRSP), weighted by company size.</p>
+              <dl class="facets">
+                <dt>In our paper</dt><dd>Our only data source. <span class="mono">tools/fetch_french.py</span> downloads and cleans it into <span class="mono">data/french_daily.csv</span>.</dd>
+                <dt>If asked</dt><dd class="ask">"It's public, documented and used in thousands of finance papers, so anyone can rerun our results. That's why we chose it over scraping Yahoo Finance."</dd>
+              </dl>
+            </article>
+
+            <article class="term" data-cat="data">
+              <h4>Value-weighted</h4>
+              <p class="plain">Each company counts in proportion to its total market value. Apple moves the index far more than a small company does.</p>
+              <dl class="facets">
+                <dt>In our paper</dt><dd>The French market return is value-weighted, so it behaves much like the S&amp;P 500 but is slightly broader.</dd>
+              </dl>
+            </article>
+
+            <article class="term" data-cat="data">
+              <h4>Training period / test period</h4>
+              <p class="plain">We learn the model's settings from one stretch of history (training), then judge it on a later stretch it has never seen (test). Like studying past exams, then sitting a new one.</p>
+              <dl class="facets">
+                <dt>In our paper</dt><dd>Train: 1990-01-02 to 2014-12-31 (6,301 days; includes the 1998, 2000–02 and 2008 crises). Test: 2015-01-02 to 2026-08-31 (2,932 days; includes 2018, the 2020 COVID crash, 2022 and the April 2025 tariff swings).</dd>
+                <dt>If asked</dt><dd class="ask">"The split is by time, never random, because shuffling days would let the model peek at the future."</dd>
+              </dl>
+            </article>
+
+            <article class="term" data-cat="data">
+              <h4>Out-of-sample</h4>
+              <p class="plain">Results measured on data the model did not use for fitting. This is the honest test of a forecasting model.</p>
+              <dl class="facets">
+                <dt>In our paper</dt><dd>All backtests and log scores are on the 2015–2026 test period only.</dd>
+              </dl>
+            </article>
+
+            <article class="term" data-cat="data">
+              <h4>Look-ahead bias</h4>
+              <p class="plain">Accidentally using information that wasn't available at the time. It makes a model look better than it could have been in real life.</p>
+              <dl class="facets">
+                <dt>In our paper</dt><dd>Avoided: parameters (ω, α, γ, β, ν, μ) come from training only, and each day's forecast uses only returns up to the day before.</dd>
+                <dt>If asked</dt><dd class="ask">"Every forecast for day t uses returns through day t−1 and parameters frozen at the end of 2014."</dd>
+              </dl>
+            </article>
+
+            <article class="term" data-cat="data">
+              <h4>Stress window</h4>
+              <p class="plain">A short period of extreme turbulence we zoom in on, to see how each model behaves when it matters most.</p>
+              <dl class="facets">
+                <dt>In our paper</dt><dd>February–April 2020 (COVID crash), including the −12.0% day on 2020-03-16.</dd>
+              </dl>
+            </article>
+
+            <article class="term" data-cat="data">
+              <h4>Trading day</h4>
+              <p class="plain">A day the stock exchange is open. There are about 252 per year, not 365.</p>
+              <dl class="facets">
+                <dt>In our paper</dt><dd>All "days" (half-life, rolling window, test length) are trading days. 250 days ≈ one trading year.</dd>
+              </dl>
+            </article>
+          </div>
+
+          <!-- RISK -->
+          <div class="group" data-group="risk">
+            <h3>Risk &amp; volatility</h3>
+
+            <article class="term" data-cat="risk">
+              <h4>Volatility <span class="aka">also: σ (sigma), standard deviation</span></h4>
+              <p class="plain">How big the market's typical daily move is, up or down. It measures size, not direction.</p>
+              <dl class="facets">
+                <dt>In our paper</dt><dd>The quantity we forecast, \(\sigma_t\). The market's average daily volatility is about 1.1% (≈ 18% a year).</dd>
+                <dt>Math</dt><dd>\( \sigma = \sqrt{\tfrac{1}{T}\sum_t (r_t - \bar r)^2} \)</dd>
+                <dt>If asked</dt><dd class="ask">"We don't forecast whether the market goes up or down. We forecast how big tomorrow's move is likely to be."</dd>
+              </dl>
+            </article>
+
+            <article class="term" data-cat="risk">
+              <h4>Variance <span class="aka">σ²</span></h4>
+              <p class="plain">Volatility squared. Models work in variance because it is always positive and adds up neatly; we take the square root at the end to talk in percent.</p>
+              <dl class="facets">
+                <dt>In our paper</dt><dd>GARCH equations are written for \(\sigma_t^2\). Forecasts are reported as \(\sigma_t\).</dd>
+              </dl>
+            </article>
+
+            <article class="term" data-cat="risk">
+              <h4>Annualized volatility</h4>
+              <p class="plain">Daily volatility scaled up to a yearly figure, which is how it's usually quoted.</p>
+              <dl class="facets">
+                <dt>In our paper</dt><dd>1.135% daily × √252 ≈ 18.0% a year for training; 18.1% for testing.</dd>
+                <dt>Math</dt><dd>\( \sigma_{\text{year}} = \sigma_{\text{day}} \sqrt{252} \)</dd>
+                <dt>If asked</dt><dd class="ask">"The √252 rule assumes days are independent, which GARCH says isn't quite true, so it's a convention, not a law."</dd>
+              </dl>
+            </article>
+
+            <article class="term" data-cat="risk">
+              <h4>Conditional vs. unconditional variance</h4>
+              <p class="plain">Unconditional: the long-run average risk, ignoring today's news. Conditional: the risk for tomorrow given everything we know today. GARCH is a model of conditional variance.</p>
+              <dl class="facets">
+                <dt>In our paper</dt><dd>\(\sigma_t^2\) is conditional. The long-run variance \(\omega/(1-\text{persistence})\) is unconditional.</dd>
+                <dt>If asked</dt><dd class="ask">"A weather forecast is conditional (it uses today's sky); the climate average is unconditional."</dd>
+              </dl>
+            </article>
+
+            <article class="term" data-cat="risk">
+              <h4>Heteroskedasticity <span class="aka">also: heteroscedasticity</span></h4>
+              <p class="plain">A long word for "the spread changes over time". <em>Conditional</em> heteroskedasticity means the spread changes in a way we can predict from the past. The "CH" in ARCH and GARCH stands for this.</p>
+              <dl class="facets">
+                <dt>In our paper</dt><dd>The core property of stock returns that makes a constant-volatility model wrong.</dd>
+                <dt>If asked</dt><dd class="ask">"Hetero = different, skedastic = spread. Risk isn't constant, and yesterday tells you something about tomorrow."</dd>
+              </dl>
+            </article>
+
+            <article class="term" data-cat="risk">
+              <h4>Volatility clustering</h4>
+              <p class="plain">Big moves tend to follow big moves, and small follow small. The signature pattern GARCH was built to capture.</p>
+              <dl class="facets">
+                <dt>In our paper</dt><dd>Lag-1 autocorrelation of returns is −0.03 (train), but of squared returns is 0.21 (train) and 0.44 (test).</dd>
+                <dt>If asked</dt><dd class="ask">"Direction is close to unpredictable; size is predictable. That's the whole opening for GARCH."</dd>
+              </dl>
+            </article>
+
+            <article class="term" data-cat="risk">
+              <h4>Autocorrelation</h4>
+              <p class="plain">How much a series is correlated with its own past values. Near 0 means yesterday tells you little about today.</p>
+              <dl class="facets">
+                <dt>In our paper</dt><dd>Used as evidence for clustering: near zero for returns, clearly positive for squared and absolute returns.</dd>
+                <dt>Math</dt><dd>\( \rho_1 = \text{corr}(x_t, x_{t-1}) \)</dd>
+              </dl>
+            </article>
+
+            <article class="term" data-cat="risk">
+              <h4>Mean reversion (of volatility)</h4>
+              <p class="plain">After a spike, risk drifts back toward its normal long-run level rather than staying high forever.</p>
+              <dl class="facets">
+                <dt>In our paper</dt><dd>Guaranteed when persistence &lt; 1. Speed is summarized by the half-life.</dd>
+              </dl>
+            </article>
+
+            <article class="term" data-cat="risk">
+              <h4>Stylized facts</h4>
+              <p class="plain">Patterns that show up in almost every financial market and period: heavy tails, volatility clustering, asymmetry, near-zero autocorrelation of returns. Cont (2001) is the standard summary.</p>
+              <dl class="facets">
+                <dt>In our paper</dt><dd>Each revision targets a stylized fact the original model ignores: asymmetry (→ γ) and heavy tails (→ Student-t).</dd>
+                <dt>If asked</dt><dd class="ask">"We didn't invent the revisions; we picked them because they address well-documented facts about returns."</dd>
+              </dl>
+            </article>
+
+            <article class="term" data-cat="risk">
+              <h4>Leverage effect <span class="aka">also: asymmetric volatility</span></h4>
+              <p class="plain">Bad news raises future volatility more than good news of the same size. Named because falling prices make companies more indebted relative to their value, though fear and selling pressure are also part of the story.</p>
+              <dl class="facets">
+                <dt>In our paper</dt><dd>Captured by γ in GJR-GARCH. Our fitted γ = 0.141 vs α = 0.001.</dd>
+                <dt>If asked</dt><dd class="ask">"In our data, good surprises add almost nothing to tomorrow's risk. Only bad surprises do."</dd>
+              </dl>
+            </article>
+
+            <article class="term" data-cat="risk">
+              <h4>Kurtosis / excess kurtosis</h4>
+              <p class="plain">A measure of how heavy the tails are, meaning how often extreme moves happen. A bell curve has kurtosis 3 ("excess kurtosis" 0).</p>
+              <dl class="facets">
+                <dt>In our paper</dt><dd>11.3 in training and 16.7 in testing, so the test period was even more extreme than training.</dd>
+                <dt>Math</dt><dd>\( \kappa = \tfrac{1}{T}\sum_t z_t^4, \quad z_t = (r_t - \bar r)/\sigma \)</dd>
+                <dt>If asked</dt><dd class="ask">"Kurtosis of 16 means extreme days are far more common than a normal curve predicts. That's why we switched to the Student-t."</dd>
+              </dl>
+            </article>
+
+            <article class="term" data-cat="risk">
+              <h4>Skewness</h4>
+              <p class="plain">Whether the distribution leans to one side. Negative skew means large drops are more common than equally large rises.</p>
+              <dl class="facets">
+                <dt>In our paper</dt><dd>−0.12 (train), −0.40 (test). Our Student-t is symmetric, so it does not capture skew; a skewed-t is a possible next revision.</dd>
+              </dl>
+            </article>
+          </div>
+
+          <!-- DIST -->
+          <div class="group" data-group="dist">
+            <h3>Distributions</h3>
+
+            <article class="term" data-cat="dist">
+              <h4>Normal distribution <span class="aka">also: Gaussian, bell curve</span></h4>
+              <p class="plain">The familiar symmetric bell shape. Most values sit near the middle and extremes are very rare.</p>
+              <dl class="facets">
+                <dt>In our paper</dt><dd>The original model assumes each day's standardized shock is normal. That is the assumption the revised model drops.</dd>
+                <dt>Math</dt><dd>\( f(z) = \dfrac{1}{\sqrt{2\pi}} e^{-z^2/2} \)</dd>
+              </dl>
+            </article>
+
+            <article class="term" data-cat="dist">
+              <h4>Heavy tails <span class="aka">also: fat tails</span></h4>
+              <p class="plain">Extreme values happen much more often than a bell curve predicts.</p>
+              <dl class="facets">
+                <dt>In our paper</dt><dd>0.60% of days beyond 4σ vs 0.006% under a normal curve. The fitted Student-t (ν ≈ 8) allows 0.17%, which is much closer but still short.</dd>
+                <dt>If asked</dt><dd class="ask">"Even the Student-t underestimates the most extreme days. It's an improvement, not a cure."</dd>
+              </dl>
+            </article>
+
+            <article class="term" data-cat="dist">
+              <h4>Student-t distribution</h4>
+              <p class="plain">A bell-shaped curve with heavier tails, controlled by one setting, ν. Small ν means heavy tails; as ν grows it becomes the normal curve.</p>
+              <dl class="facets">
+                <dt>In our paper</dt><dd>The revised model's shock distribution, following Bollerslev (1987). Fitted ν ≈ 8.0.</dd>
+                <dt>If asked</dt><dd class="ask">"It's the smallest change that gives crash days realistic weight: one extra parameter, and it nests the normal as a special case."</dd>
+              </dl>
+            </article>
+
+            <article class="term" data-cat="dist">
+              <h4>Degrees of freedom <span class="aka">ν (nu)</span></h4>
+              <p class="plain">The Student-t's tail-heaviness knob. ν = 3–5 is very heavy, ν ≈ 8 is moderately heavy, ν = ∞ is the normal curve.</p>
+              <dl class="facets">
+                <dt>In our paper</dt><dd>ν ≈ 8.0 for GJR-t, 7.1 for GARCH-t. We force ν &gt; 2 so the variance exists.</dd>
+                <dt>Math</dt><dd>\( \nu = 2 + e^{z} \) (so it can never go below 2)</dd>
+                <dt>If asked</dt><dd class="ask">"The data chose ν ≈ 8 by maximum likelihood; we didn't set it by hand."</dd>
+              </dl>
+            </article>
+
+            <article class="term" data-cat="dist">
+              <h4>Standardized Student-t</h4>
+              <p class="plain">A Student-t rescaled so its variance is exactly 1. That keeps σ<sub>t</sub> meaning "volatility" in both models, so the comparison is fair.</p>
+              <dl class="facets">
+                <dt>In our paper</dt><dd>Used for \(z_t\) in the t models.</dd>
+                <dt>Math</dt><dd>\( z = t_\nu \sqrt{(\nu-2)/\nu} \)</dd>
+              </dl>
+            </article>
+
+            <article class="term" data-cat="dist">
+              <h4>PDF and CDF</h4>
+              <p class="plain">The PDF (density) gives how likely each value is. The CDF gives the probability of being at or below a value.</p>
+              <dl class="facets">
+                <dt>In our paper</dt><dd>The PDF goes into the likelihood. The CDF is inverted to get VaR quantiles.</dd>
+                <dt>Math</dt><dd>\( F(x) = P(Z \le x) = \int_{-\infty}^{x} f(u)\,du \)</dd>
+              </dl>
+            </article>
+
+            <article class="term" data-cat="dist">
+              <h4>Quantile <span class="aka">also: percentile, inverse CDF</span></h4>
+              <p class="plain">The value that a given share of outcomes fall below. The 1% quantile is the cutoff where only 1 day in 100 is worse.</p>
+              <dl class="facets">
+                <dt>In our paper</dt><dd>1% quantile: −2.326 (normal) vs −2.509 (standardized t, ν = 8). 5% quantile: −1.645 vs −1.610.</dd>
+                <dt>If asked</dt><dd class="ask">"Note the crossover: the t is more extreme at 1% but slightly <em>less</em> extreme at 5%. Heavy tails move probability to both the far tails and the center."</dd>
+              </dl>
+            </article>
+
+            <article class="term" data-cat="dist">
+              <h4>i.i.d.</h4>
+              <p class="plain">"Independent and identically distributed": each draw comes from the same distribution and doesn't depend on the others.</p>
+              <dl class="facets">
+                <dt>In our paper</dt><dd>We assume the standardized shocks \(z_t\) are i.i.d. The returns themselves are not, because their volatility changes.</dd>
+              </dl>
+            </article>
+          </div>
+
+          <!-- MODEL -->
+          <div class="group" data-group="model">
+            <h3>The models</h3>
+
+            <article class="term" data-cat="model">
+              <h4>Shock <span class="aka">also: innovation, surprise, e<sub>t</sub></span></h4>
+              <p class="plain">How far today's return was from its average. The "news" the model reacts to.</p>
+              <dl class="facets">
+                <dt>In our paper</dt><dd>\(\mu\) is the training-sample average daily return (0.0435%).</dd>
+                <dt>Math</dt><dd>\( e_t = r_t - \mu = \sigma_t z_t \)</dd>
+              </dl>
+            </article>
+
+            <article class="term" data-cat="model">
+              <h4>Standardized residual <span class="aka">z<sub>t</sub></span></h4>
+              <p class="plain">The shock divided by the predicted volatility. It answers "how surprising was today, given how risky we thought it would be?"</p>
+              <dl class="facets">
+                <dt>Math</dt><dd>\( z_t = e_t / \sigma_t \)</dd>
+                <dt>If asked</dt><dd class="ask">"A −3% day is a 3-sigma shock in a calm market but only a 1-sigma shock in a crisis."</dd>
+              </dl>
+            </article>
+
+            <article class="term" data-cat="model">
+              <h4>ARCH</h4>
+              <p class="plain">AutoRegressive Conditional Heteroskedasticity (Engle, 1982). Tomorrow's variance depends on recent squared shocks. Engle later shared the 2003 Nobel Prize in Economics for it.</p>
+              <dl class="facets">
+                <dt>Math</dt><dd>\( \sigma_t^2 = \omega + \alpha_1 e_{t-1}^2 + \dots + \alpha_q e_{t-q}^2 \)</dd>
+                <dt>If asked</dt><dd class="ask">"ARCH needs many lags to capture slow-fading risk. GARCH does it with one extra term."</dd>
+              </dl>
+            </article>
+
+            <article class="term" data-cat="model">
+              <h4>GARCH(1,1) <span class="aka">our original model</span></h4>
+              <p class="plain">Generalized ARCH (Bollerslev, 1986). Tomorrow's risk = a small baseline + a reaction to today's surprise + most of today's risk carried forward. "(1,1)" means one lag of the surprise and one lag of the variance.</p>
+              <dl class="facets">
+                <dt>In our paper</dt><dd>With normal shocks. Fitted ω = 0.0123, α = 0.084, β = 0.906.</dd>
+                <dt>Math</dt><dd>\( \sigma_t^2 = \omega + \alpha e_{t-1}^2 + \beta \sigma_{t-1}^2 \)</dd>
+                <dt>If asked</dt><dd class="ask">"It's a recursive, nonlinear model of a quantity we never observe directly, fitted by maximum likelihood. That's why it isn't a regression."</dd>
+              </dl>
+            </article>
+
+            <article class="term" data-cat="model">
+              <h4>ω (omega)</h4>
+              <p class="plain">The baseline: a small constant amount of variance added every day. It sets the level risk drifts back to.</p>
+              <dl class="facets">
+                <dt>In our paper</dt><dd>0.0123 (original), 0.0116 (revised). Must be &gt; 0.</dd>
+              </dl>
+            </article>
+
+            <article class="term" data-cat="model">
+              <h4>α (alpha)</h4>
+              <p class="plain">The reaction: how much today's surprise (squared) raises tomorrow's variance. In GJR it applies to <em>all</em> surprises, good or bad.</p>
+              <dl class="facets">
+                <dt>In our paper</dt><dd>0.084 (original). 0.001 (revised), because the revised model moves the reaction to γ.</dd>
+                <dt>If asked</dt><dd class="ask">"α ≈ 0 in the revised model doesn't mean the model ignores news. It means good news adds nothing beyond what bad news adds through γ."</dd>
+              </dl>
+            </article>
+
+            <article class="term" data-cat="model">
+              <h4>β (beta)</h4>
+              <p class="plain">The memory: how much of today's variance carries over to tomorrow. Close to 1 means risk fades slowly.</p>
+              <dl class="facets">
+                <dt>In our paper</dt><dd>0.906 (original), 0.918 (revised).</dd>
+                <dt>If asked</dt><dd class="ask">"This β is not the CAPM market beta. Here it's the memory of volatility."</dd>
+              </dl>
+            </article>
+
+            <article class="term" data-cat="model">
+              <h4>GJR-GARCH(1,1) <span class="aka">our revised model (with Student-t)</span></h4>
+              <p class="plain">GARCH with one extra term (Glosten, Jagannathan &amp; Runkle, 1993) that adds more risk only after a bad day.</p>
+              <dl class="facets">
+                <dt>In our paper</dt><dd>Fitted ω = 0.0116, α = 0.001, γ = 0.141, β = 0.918, ν = 8.0.</dd>
+                <dt>Math</dt><dd>\( \sigma_t^2 = \omega + \big(\alpha + \gamma\, \mathbb{1}[e_{t-1}&lt;0]\big) e_{t-1}^2 + \beta \sigma_{t-1}^2 \)</dd>
+                <dt>If asked</dt><dd class="ask">"Set γ = 0 and you get the original GARCH back. The revision is a strict extension, so the comparison is clean."</dd>
+              </dl>
+            </article>
+
+            <article class="term" data-cat="model">
+              <h4>γ (gamma)</h4>
+              <p class="plain">The extra reaction to bad surprises only. If γ &gt; 0, a drop raises risk more than a rise of the same size.</p>
+              <dl class="facets">
+                <dt>In our paper</dt><dd>0.141. After a bad day the total reaction is α + γ ≈ 0.142; after a good day it's α ≈ 0.001.</dd>
+              </dl>
+            </article>
+
+            <article class="term" data-cat="model">
+              <h4>Indicator function <span class="aka">𝟙[·]</span></h4>
+              <p class="plain">A switch that equals 1 when the condition is true and 0 otherwise.</p>
+              <dl class="facets">
+                <dt>In our paper</dt><dd>\(\mathbb{1}[e_{t-1}&lt;0]\) turns γ on only after a bad day.</dd>
+              </dl>
+            </article>
+
+            <article class="term" data-cat="model">
+              <h4>Persistence</h4>
+              <p class="plain">How much of a shock to risk survives from one day to the next. Close to 1 means storms fade slowly.</p>
+              <dl class="facets">
+                <dt>In our paper</dt><dd>0.9898 (original), 0.9892 (revised). For GJR, γ counts half because bad days happen about half the time.</dd>
+                <dt>Math</dt><dd>GARCH: \( \alpha + \beta \). GJR: \( \alpha + \gamma/2 + \beta \)</dd>
+                <dt>If asked</dt><dd class="ask">"Persistence of 0.99 is typical for daily stock returns in the literature, which is one sign our fit is sensible."</dd>
+              </dl>
+            </article>
+
+            <article class="term" data-cat="model">
+              <h4>Half-life</h4>
+              <p class="plain">How many days until half of a shock to risk has faded away.</p>
+              <dl class="facets">
+                <dt>In our paper</dt><dd>67 days (original), 64 days (revised): about three months.</dd>
+                <dt>Math</dt><dd>\( h = \dfrac{\ln 0.5}{\ln(\text{persistence})} \)</dd>
+              </dl>
+            </article>
+
+            <article class="term" data-cat="model">
+              <h4>Long-run variance <span class="aka">also: unconditional variance</span></h4>
+              <p class="plain">The level of risk the model drifts back to when nothing unusual happens.</p>
+              <dl class="facets">
+                <dt>In our paper</dt><dd>Long-run daily volatility 1.10% (original), 1.04% (revised); about 16–17% a year.</dd>
+                <dt>Math</dt><dd>\( \bar\sigma^2 = \dfrac{\omega}{1 - \text{persistence}} \)</dd>
+              </dl>
+            </article>
+
+            <article class="term" data-cat="model">
+              <h4>Stationarity (covariance stationarity)</h4>
+              <p class="plain">The model's risk doesn't explode over time; it has a finite long-run level. Requires persistence below 1.</p>
+              <dl class="facets">
+                <dt>In our paper</dt><dd>Enforced by construction through the reparameterization, so every fitted model is stationary.</dd>
+                <dt>Math</dt><dd>\( \omega &gt; 0,\ \alpha,\gamma,\beta \ge 0,\ \alpha + \gamma/2 + \beta &lt; 1 \)</dd>
+              </dl>
+            </article>
+
+            <article class="term" data-cat="model">
+              <h4>News impact curve</h4>
+              <p class="plain">A picture of tomorrow's volatility as a function of today's surprise, starting from a normal day. GARCH draws a symmetric U; GJR draws a lopsided one.</p>
+              <dl class="facets">
+                <dt>In our paper</dt><dd>Figure <span class="mono">fig_garch_news.png</span>. Revised model: −3% day → 1.51%; +3% day → 1.00%. Original: 1.36% either way.</dd>
+                <dt>If asked</dt><dd class="ask">"This one picture is the asymmetry finding. The right half of the orange curve is almost flat."</dd>
+              </dl>
+            </article>
+
+            <article class="term" data-cat="model">
+              <h4>EWMA / RiskMetrics</h4>
+              <p class="plain">Exponentially weighted moving average: recent days count more, older days fade at a fixed rate. Introduced as an industry standard by J.P. Morgan's RiskMetrics (1996) with λ = 0.94.</p>
+              <dl class="facets">
+                <dt>In our paper</dt><dd>A benchmark. It's GARCH with ω = 0, α = 0.06, β = 0.94, so persistence = 1 and there is no long-run level to return to.</dd>
+                <dt>Math</dt><dd>\( \sigma_t^2 = (1-\lambda) e_{t-1}^2 + \lambda \sigma_{t-1}^2 \)</dd>
+                <dt>If asked</dt><dd class="ask">"EWMA has nothing fitted. GARCH learns its settings from data and adds mean reversion."</dd>
+              </dl>
+            </article>
+
+            <article class="term" data-cat="model">
+              <h4>Rolling-window volatility <span class="aka">our naive benchmark</span></h4>
+              <p class="plain">Just the standard deviation of the last 250 trading days (about one year). What most people would do without a model.</p>
+              <dl class="facets">
+                <dt>In our paper</dt><dd>The "calm year" trap: it reacts slowly going into a crisis and stays too cautious after it.</dd>
+              </dl>
+            </article>
+
+            <article class="term" data-cat="model">
+              <h4>Nested models</h4>
+              <p class="plain">One model is a special case of another. GARCH-normal is GJR-t with γ = 0 and ν = ∞.</p>
+              <dl class="facets">
+                <dt>In our paper</dt><dd>We fit all four combinations (GARCH/GJR × normal/t) so we can see which revision helps and by how much.</dd>
+                <dt>If asked</dt><dd class="ask">"Fitting the in-between models shows each fix pulls its weight on its own."</dd>
+              </dl>
+            </article>
+          </div>
+
+          <!-- FIT -->
+          <div class="group" data-group="fit">
+            <h3>Fitting the models</h3>
+
+            <article class="term" data-cat="fit">
+              <h4>Likelihood</h4>
+              <p class="plain">For a given set of parameter values: how probable the data we actually saw would be. Better parameters make the real history look less surprising.</p>
+              <dl class="facets">
+                <dt>Math</dt><dd>\( L(\theta) = \prod_t f(r_t \mid r_1,\dots,r_{t-1};\theta) \)</dd>
+                <dt>If asked</dt><dd class="ask">"We pick the settings under which 25 years of real market history is least surprising."</dd>
+              </dl>
+            </article>
+
+            <article class="term" data-cat="fit">
+              <h4>Log-likelihood / negative log-likelihood</h4>
+              <p class="plain">The log turns a product of tiny numbers into a sum, which computers handle better. We minimize the <em>negative</em> log-likelihood because optimizers look for minimums.</p>
+              <dl class="facets">
+                <dt>In our paper</dt><dd>Training −log L: 8,395.6 (original) vs 8,199.5 (revised). Lower is better.</dd>
+                <dt>Math (normal)</dt><dd>\( -\ell = \tfrac12 \sum_t \Big[\ln 2\pi + \ln \sigma_t^2 + \dfrac{e_t^2}{\sigma_t^2}\Big] \)</dd>
+              </dl>
+            </article>
+
+            <article class="term" data-cat="fit">
+              <h4>Maximum likelihood estimation (MLE)</h4>
+              <p class="plain">Choosing parameters that make the likelihood as large as possible.</p>
+              <dl class="facets">
+                <dt>In our paper</dt><dd>How all four GARCH variants are fitted, with our own optimizer.</dd>
+                <dt>If asked</dt><dd class="ask">"We can't use least squares because volatility is never observed. We only see returns, so we fit the distribution of returns instead."</dd>
+              </dl>
+            </article>
+
+            <article class="term" data-cat="fit">
+              <h4>Student-t log-likelihood</h4>
+              <p class="plain">The same idea as the normal version, but using the standardized t density. Big shocks are penalized less, so one crash day doesn't wreck the fit.</p>
+              <dl class="facets">
+                <dt>Math</dt><dd>\( \ell_t = \ln\Gamma\!\big(\tfrac{\nu+1}{2}\big) - \ln\Gamma\!\big(\tfrac{\nu}{2}\big) - \tfrac12\ln\!\big(\pi(\nu-2)\big) - \tfrac12 \ln\sigma_t^2 - \tfrac{\nu+1}{2}\ln\!\Big(1+\dfrac{e_t^2}{\sigma_t^2(\nu-2)}\Big) \)</dd>
+              </dl>
+            </article>
+
+            <article class="term" data-cat="fit">
+              <h4>Optimizer</h4>
+              <p class="plain">An algorithm that searches for the parameter values giving the lowest (or highest) score.</p>
+              <dl class="facets">
+                <dt>In our paper</dt><dd>Our own Nelder–Mead in <span class="mono">model/optim.py</span>. SciPy is not allowed in the course.</dd>
+              </dl>
+            </article>
+
+            <article class="term" data-cat="fit">
+              <h4>Nelder–Mead simplex method</h4>
+              <p class="plain">A search that needs no derivatives. It keeps a small cluster of trial points (a "simplex"), throws away the worst one and replaces it by reflecting, stretching, pulling in or shrinking the cluster, until all points agree.</p>
+              <dl class="facets">
+                <dt>In our paper</dt><dd>Nelder &amp; Mead (1965). Stops when the best and worst trial points' scores differ by less than 1e-10 (relative), or after 5,000 steps.</dd>
+                <dt>If asked</dt><dd class="ask">"With only 4–6 parameters it's reliable and needs no gradient, which matters because the GARCH recursion makes gradients messy to derive and code by hand."</dd>
+              </dl>
+            </article>
+
+            <article class="term" data-cat="fit">
+              <h4>Simplex moves: reflect, expand, contract, shrink</h4>
+              <p class="plain">Reflect: flip the worst point through the middle of the others. Expand: if that worked very well, go twice as far. Contract: if it failed, try halfway back. Shrink: if all else fails, pull everything toward the best point.</p>
+              <dl class="facets">
+                <dt>In our paper</dt><dd>Coefficients 1 (reflect), 2 (expand), 0.5 (contract), 0.5 (shrink), the textbook values.</dd>
+              </dl>
+            </article>
+
+            <article class="term" data-cat="fit">
+              <h4>Restarts</h4>
+              <p class="plain">Running the search again from the best point found, with a smaller starting cluster, to make sure it didn't stall early.</p>
+              <dl class="facets">
+                <dt>In our paper</dt><dd>Up to 3 runs, halving the step each time, stopping when the score stops improving.</dd>
+              </dl>
+            </article>
+
+            <article class="term" data-cat="fit">
+              <h4>Reparameterization</h4>
+              <p class="plain">Letting the optimizer search over unrestricted numbers, then converting them into parameters that automatically obey the rules (positive, persistence &lt; 1, ν &gt; 2).</p>
+              <dl class="facets">
+                <dt>In our paper</dt><dd>Tested on 1,000 random draws: the constraints always hold.</dd>
+                <dt>Math</dt><dd>\( \omega = e^{z_0},\quad [\alpha,\ \tfrac{\gamma}{2},\ \beta] = \dfrac{e^{z_{1:3}}}{1 + \sum e^{z_{1:3}}},\quad \nu = 2 + e^{z_4} \)</dd>
+                <dt>If asked</dt><dd class="ask">"Instead of rejecting bad guesses, we made bad guesses impossible."</dd>
+              </dl>
+            </article>
+
+            <article class="term" data-cat="fit">
+              <h4>Starting values and initial variance</h4>
+              <p class="plain">Where the search begins, and what variance the recursion uses on day one.</p>
+              <dl class="facets">
+                <dt>In our paper</dt><dd>Start near typical values (α ≈ 0.08, persistence ≈ 0.98, ν ≈ 6). Day-one variance = training sample variance (1.288).</dd>
+              </dl>
+            </article>
+
+            <article class="term" data-cat="fit">
+              <h4>Local vs. global optimum</h4>
+              <p class="plain">A local optimum is the best point nearby; the global optimum is the best point anywhere. Searches can get stuck on a local one.</p>
+              <dl class="facets">
+                <dt>If asked</dt><dd class="ask">"We guard against this with sensible starting values, restarts, and a test showing the fit recovers known parameters from simulated data."</dd>
+              </dl>
+            </article>
+
+            <article class="term" data-cat="fit">
+              <h4>Parameter recovery test</h4>
+              <p class="plain">Simulate data from a model with known settings, fit it, and check you get those settings back. If you can't recover the truth on fake data, you can't trust the fit on real data.</p>
+              <dl class="facets">
+                <dt>In our paper</dt><dd>8,000 simulated days with ω = 0.02, α = 0.03, γ = 0.12, β = 0.88, ν = 6. Our fit recovers γ within 0.04, β within 0.03, α within 0.03 and ν in 4.5–8.5 (<span class="mono">model/test_garch.py</span>).</dd>
+              </dl>
+            </article>
+
+            <article class="term" data-cat="fit">
+              <h4>AIC and BIC</h4>
+              <p class="plain">Scores that reward fit but charge a penalty for each extra parameter, so a bigger model has to earn its complexity. Lower is better. BIC's penalty is stricter.</p>
+              <dl class="facets">
+                <dt>In our paper</dt><dd>AIC 16,799 → 16,411; BIC 16,826 → 16,451 (original → revised). k = 4 vs 6 parameters.</dd>
+                <dt>Math</dt><dd>\( \text{AIC} = 2(-\ell) + 2k, \quad \text{BIC} = 2(-\ell) + k\ln n \)</dd>
+                <dt>If asked</dt><dd class="ask">"The revised model has two more parameters, but its fit improves by far more than the penalty."</dd>
+              </dl>
+            </article>
+
+            <article class="term" data-cat="fit">
+              <h4>Likelihood-ratio comparison</h4>
+              <p class="plain">Twice the gap in log-likelihood between a smaller and a bigger nested model. Large values mean the extra parameters really help.</p>
+              <dl class="facets">
+                <dt>In our paper</dt><dd>2 × (8,395.6 − 8,199.5) ≈ 392 for 2 extra parameters, far above the usual 5.99 cutoff.</dd>
+                <dt>If asked</dt><dd class="ask">"Strictly, ν = ∞ sits on the edge of the parameter space so the textbook χ² cutoff is only approximate, but 392 is far past any reasonable threshold."</dd>
+              </dl>
+            </article>
+
+            <article class="term" data-cat="fit">
+              <h4>Bisection</h4>
+              <p class="plain">Find where a function crosses a target by repeatedly cutting the search interval in half.</p>
+              <dl class="facets">
+                <dt>In our paper</dt><dd>How we compute the normal quantile from the CDF (via <span class="mono">math.erf</span>) without SciPy. Accurate to 1e-8.</dd>
+              </dl>
+            </article>
+
+            <article class="term" data-cat="fit">
+              <h4>Numerical integration (trapezoid rule)</h4>
+              <p class="plain">Approximate an area under a curve by slicing it into thin trapezoids and adding them up.</p>
+              <dl class="facets">
+                <dt>In our paper</dt><dd>How we get the Student-t CDF, and from it the quantile. We substitute \(x = \tan\theta\) so the infinite tail becomes a finite interval.</dd>
+                <dt>If asked</dt><dd class="ask">"It matches the published t-table value for ν = 5 to three decimals, and the normal quantile when ν is huge."</dd>
+              </dl>
+            </article>
+
+            <article class="term" data-cat="fit">
+              <h4>Vectorization vs. recursion</h4>
+              <p class="plain">Vectorized code processes whole arrays at once (fast in NumPy). A recursion must go day by day because each step needs the previous one.</p>
+              <dl class="facets">
+                <dt>In our paper</dt><dd>The GARCH variance path is an unavoidable loop; the likelihood, benchmarks and backtests are vectorized.</dd>
+              </dl>
+            </article>
+          </div>
+
+          <!-- TEST -->
+          <div class="group" data-group="test">
+            <h3>Testing the forecasts</h3>
+
+            <article class="term" data-cat="test">
+              <h4>Value-at-Risk (VaR)</h4>
+              <p class="plain">A loss threshold you expect to be crossed on only a small share of days. "1% daily VaR of −2.5%" means: on 99 days out of 100 we don't expect to lose more than 2.5%.</p>
+              <dl class="facets">
+                <dt>In our paper</dt><dd>Computed every test day for 1% and 5% levels as a return threshold.</dd>
+                <dt>Math</dt><dd>\( \text{VaR}_t^{(p)} = \mu + q_p\, \sigma_t \)</dd>
+                <dt>If asked</dt><dd class="ask">"VaR is not the worst case. It says nothing about <em>how bad</em> things get on the 1 day in 100."</dd>
+              </dl>
+            </article>
+
+            <article class="term" data-cat="test">
+              <h4>VaR level vs. confidence level</h4>
+              <p class="plain">"1% VaR" and "99% VaR" are the same thing described from opposite sides: 1% tail probability, 99% confidence.</p>
+              <dl class="facets">
+                <dt>If asked</dt><dd class="ask">"We say 1% VaR. Banking regulation usually says 99% VaR. Same number."</dd>
+              </dl>
+            </article>
+
+            <article class="term" data-cat="test">
+              <h4>Breach <span class="aka">also: exceedance, exception, violation, hit</span></h4>
+              <p class="plain">A day whose actual loss was worse than the VaR limit.</p>
+              <dl class="facets">
+                <dt>In our paper</dt><dd>Expected over 2,932 test days: about 29 at 1% and 147 at 5%. The triangles in <span class="mono">fig_garch_covid.png</span> mark breaches.</dd>
+              </dl>
+            </article>
+
+            <article class="term" data-cat="test">
+              <h4>Hit sequence</h4>
+              <p class="plain">A list of 1s and 0s, one per day: 1 if the VaR was breached, 0 if not. Both backtests are computed from it.</p>
+              <dl class="facets">
+                <dt>Math</dt><dd>\( I_t = \mathbb{1}[r_t &lt; \text{VaR}_t] \)</dd>
+              </dl>
+            </article>
+
+            <article class="term" data-cat="test">
+              <h4>Backtesting</h4>
+              <p class="plain">Checking a risk model against what actually happened afterwards.</p>
+              <dl class="facets">
+                <dt>In our paper</dt><dd>Two questions: were there the right <em>number</em> of breaches (Kupiec), and did they arrive independently rather than in bunches (Christoffersen)?</dd>
+              </dl>
+            </article>
+
+            <article class="term" data-cat="test">
+              <h4>Kupiec test <span class="aka">also: unconditional coverage, proportion of failures (POF)</span></h4>
+              <p class="plain">Is the breach rate close enough to the target (1% or 5%) that the gap could be bad luck?</p>
+              <dl class="facets">
+                <dt>In our paper</dt><dd>Kupiec (1995). At 5%, the revised model passes (p = 0.53). At 1%, every model fails (p &lt; 0.001).</dd>
+                <dt>Math</dt><dd>\( LR_{uc} = -2\ln\dfrac{(1-p)^{n-x}p^{x}}{(1-\hat p)^{n-x}\hat p^{x}},\ \ \hat p = x/n,\ \ LR_{uc} \sim \chi^2_1 \)</dd>
+                <dt>If asked</dt><dd class="ask">"It only counts breaches. A model could pass while all its breaches arrive in one terrible week, so we also run Christoffersen."</dd>
+              </dl>
+            </article>
+
+            <article class="term" data-cat="test">
+              <h4>Christoffersen test <span class="aka">also: conditional coverage</span></h4>
+              <p class="plain">Kupiec's count check plus an independence check: is a breach today more likely if there was one yesterday? A good model's breaches should be scattered.</p>
+              <dl class="facets">
+                <dt>In our paper</dt><dd>Christoffersen (1998). At 5%: revised p = 0.33 (pass), original 0.17 (pass), rolling 0.000 (fail).</dd>
+                <dt>Math</dt><dd>\( LR_{cc} = LR_{uc} + LR_{ind} \sim \chi^2_2 \)</dd>
+                <dt>If asked</dt><dd class="ask">"Clustered breaches mean the model is slow to notice that risk has risen, which is exactly the failure we care about."</dd>
+              </dl>
+            </article>
+
+            <article class="term" data-cat="test">
+              <h4>p-value</h4>
+              <p class="plain">If the model were exactly right, how often would we see a result at least this far off just by chance? Small (under 0.05) means "too unlikely to be luck", so we reject the model.</p>
+              <dl class="facets">
+                <dt>If asked</dt><dd class="ask">"A p-value is not the probability that the model is correct. A high p-value means the data doesn't contradict the model, not that we've proved it."</dd>
+              </dl>
+            </article>
+
+            <article class="term" data-cat="test">
+              <h4>Likelihood-ratio test and χ² (chi-square)</h4>
+              <p class="plain">Compare how well a "model is perfect" hypothesis explains the data against the best possible explanation. The chi-square distribution tells us how big that gap can get by chance.</p>
+              <dl class="facets">
+                <dt>In our paper</dt><dd>5% cutoffs: 3.84 for one degree of freedom (Kupiec), 5.99 for two (Christoffersen). We compute p-values with <span class="mono">math.erfc</span> and <span class="mono">exp</span>, no SciPy.</dd>
+                <dt>Math</dt><dd>\( P(\chi^2_1 &gt; x) = \text{erfc}\big(\sqrt{x/2}\big), \quad P(\chi^2_2 &gt; x) = e^{-x/2} \)</dd>
+              </dl>
+            </article>
+
+            <article class="term" data-cat="test">
+              <h4>Log score <span class="aka">also: predictive log-likelihood, out-of-sample −log L per day</span></h4>
+              <p class="plain">How surprised the model was, on average, by each test day's actual return. Lower is better. It judges the whole forecast distribution, not just one cutoff.</p>
+              <dl class="facets">
+                <dt>In our paper</dt><dd>1.337 (original) → 1.287 (revised); best of all six models. Rolling volatility is worst at 1.516.</dd>
+                <dt>If asked</dt><dd class="ask">"Backtests only look at the tail; the log score checks every day. The revised model wins on both."</dd>
+              </dl>
+            </article>
+
+            <article class="term" data-cat="test">
+              <h4>Basel traffic-light test</h4>
+              <p class="plain">Banking regulators count 99% VaR breaches over the last 250 days: 0–4 is green, 5–9 yellow (higher capital charge), 10 or more red.</p>
+              <dl class="facets">
+                <dt>In our paper</dt><dd>Not computed, but a useful real-world anchor for why the 1% breach count matters.</dd>
+              </dl>
+            </article>
+
+            <article class="term" data-cat="test">
+              <h4>Expected Shortfall (ES)</h4>
+              <p class="plain">The average loss on the days that do breach VaR. It answers "when it's bad, how bad?" Regulators have been moving from VaR toward ES.</p>
+              <dl class="facets">
+                <dt>In our paper</dt><dd>Not yet computed; a natural next step and a good answer to "what are VaR's limits?"</dd>
+              </dl>
+            </article>
+
+            <article class="term" data-cat="test">
+              <h4>Diebold–Mariano test</h4>
+              <p class="plain">A test of whether one forecast's average score is significantly better than another's, or could be chance.</p>
+              <dl class="facets">
+                <dt>In our paper</dt><dd>Not yet run. It's the right tool to formally test the log-score gap (1.337 vs 1.287).</dd>
+                <dt>If asked</dt><dd class="ask">"We report the gap; a formal significance test of it is planned for the final paper."</dd>
+              </dl>
+            </article>
+
+            <article class="term" data-cat="test">
+              <h4>Model risk</h4>
+              <p class="plain">The danger that decisions go wrong because the model itself is wrong, for example by assuming a bell curve.</p>
+              <dl class="facets">
+                <dt>In our paper</dt><dd>The motivation for the whole study: a model that underestimates risk fails exactly when it matters most.</dd>
+              </dl>
+            </article>
+          </div>
+        </div>
+        <p class="nohits" id="nohits" hidden>No terms match. Try a shorter word, or choose "All".</p>
+      </section>
+
+      <!-- 5 -->
+      <section id="numbers">
+        <div class="sec-head">
+          <span class="eyebrow">Section 5</span>
+          <h2>Our numbers, explained</h2>
+          <p>Prototype results from <span class="mono">results/garch_results.md</span>. <span class="o">Blue</span> marks the original model, <span class="r">orange</span> the revised one.</p>
+        </div>
+
+        <h3>Fitted parameters (training, 1990–2014)</h3>
+        <div class="tbl">
+          <table>
+            <thead><tr><th>Model</th><th>ω</th><th>α</th><th>γ</th><th>β</th><th>ν</th><th>Persistence</th><th>Half-life</th><th>AIC</th></tr></thead>
+            <tbody>
+              <tr class="is-o"><td>GARCH, normal (original)</td><td>0.0123</td><td>0.084</td><td>—</td><td>0.906</td><td>∞</td><td>0.9898</td><td>67 d</td><td>16,799</td></tr>
+              <tr><td>GARCH, Student-t</td><td>0.0072</td><td>0.074</td><td>—</td><td>0.922</td><td>7.1</td><td>0.9959</td><td>168 d</td><td>16,577</td></tr>
+              <tr><td>GJR, normal</td><td>0.0160</td><td>0.005</td><td>0.137</td><td>0.909</td><td>∞</td><td>0.9828</td><td>40 d</td><td>16,600</td></tr>
+              <tr class="is-r"><td>GJR, Student-t (revised)</td><td>0.0116</td><td>0.001</td><td>0.141</td><td>0.918</td><td>8.0</td><td>0.9892</td><td>64 d</td><td>16,411</td></tr>
+            </tbody>
+          </table>
+        </div>
+        <p class="read">How to read it: each fix lowers AIC on its own (t: −222; asymmetry: −199), and together they lower it by 388. Asymmetry is the bigger single change in what the model believes: once γ is allowed, α collapses to near zero in both GJR variants.</p>
+
+        <h3>1% Value-at-Risk backtest (test, 2,932 days; target ≈ 29 breaches)</h3>
+        <div class="tbl">
+          <table>
+            <thead><tr><th>Model</th><th>Breaches</th><th>Rate</th><th>Kupiec p</th><th>Christoffersen p</th><th>Feb–Apr 2020</th><th>Avg VaR</th></tr></thead>
+            <tbody>
+              <tr><td>Rolling 250-day</td><td>76</td><td>2.59%</td><td class="fail">0.000</td><td class="fail">0.000</td><td>12</td><td>−2.43%</td></tr>
+              <tr><td>EWMA λ = 0.94</td><td>67</td><td>2.29%</td><td class="fail">0.000</td><td class="fail">0.000</td><td>6</td><td>−2.26%</td></tr>
+              <tr class="is-o"><td>GARCH, normal (original)</td><td>60</td><td>2.05%</td><td class="fail">0.000</td><td class="fail">0.000</td><td>6</td><td>−2.28%</td></tr>
+              <tr><td>GARCH, Student-t</td><td>56</td><td>1.91%</td><td class="fail">0.000</td><td class="fail">0.000</td><td>6</td><td>−2.51%</td></tr>
+              <tr><td>GJR, normal</td><td>58</td><td>1.98%</td><td class="fail">0.000</td><td class="fail">0.000</td><td>5</td><td>−2.26%</td></tr>
+              <tr class="is-r"><td>GJR, Student-t (revised)</td><td>51</td><td>1.74%</td><td class="fail">0.000</td><td class="fail">0.000</td><td>2</td><td>−2.47%</td></tr>
+            </tbody>
+          </table>
+        </div>
+        <p class="read">How to read it: every model breaches too often at 1%, so all fail. The revised model is closest (51 vs 60 for the original) and was caught out on only 2 days in the 2020 crash (Feb 24 and Mar 9) against 6 for the original and 12 for the rolling rule. The rolling rule is the most cautious on average (−2.43%) yet breaches the most: its caution arrives at the wrong time.</p>
+
+        <h3>5% Value-at-Risk backtest (target ≈ 147 breaches)</h3>
+        <div class="tbl">
+          <table>
+            <thead><tr><th>Model</th><th>Breaches</th><th>Rate</th><th>Kupiec p</th><th>Christoffersen p</th></tr></thead>
+            <tbody>
+              <tr><td>Rolling 250-day</td><td>161</td><td>5.49%</td><td class="pass">0.229</td><td class="fail">0.000</td></tr>
+              <tr><td>EWMA λ = 0.94</td><td>180</td><td>6.14%</td><td class="fail">0.006</td><td class="fail">0.002</td></tr>
+              <tr class="is-o"><td>GARCH, normal (original)</td><td>163</td><td>5.56%</td><td class="pass">0.172</td><td class="pass">0.167</td></tr>
+              <tr><td>GARCH, Student-t</td><td>172</td><td>5.87%</td><td class="fail">0.036</td><td class="fail">0.020</td></tr>
+              <tr><td>GJR, normal</td><td>149</td><td>5.08%</td><td class="pass">0.839</td><td class="pass">0.456</td></tr>
+              <tr class="is-r"><td>GJR, Student-t (revised)</td><td>154</td><td>5.25%</td><td class="pass">0.534</td><td class="pass">0.325</td></tr>
+            </tbody>
+          </table>
+        </div>
+        <p class="read">How to read it: at 5% the original and revised models both pass. The rolling rule gets roughly the right count but its breaches clump together, so Christoffersen rejects it. GJR-normal is actually the best at 5%; be ready to say so (see the question on this below).</p>
+
+        <h3>Out-of-sample log score (lower is better)</h3>
+        <div class="tbl">
+          <table>
+            <thead><tr><th>Model</th><th>−log L per day</th></tr></thead>
+            <tbody>
+              <tr><td>Rolling 250-day</td><td>1.5163</td></tr>
+              <tr><td>EWMA λ = 0.94</td><td>1.3598</td></tr>
+              <tr class="is-o"><td>GARCH, normal (original)</td><td>1.3370</td></tr>
+              <tr><td>GARCH, Student-t</td><td>1.3080</td></tr>
+              <tr><td>GJR, normal</td><td>1.3156</td></tr>
+              <tr class="is-r"><td>GJR, Student-t (revised)</td><td>1.2867</td></tr>
+            </tbody>
+          </table>
+        </div>
+        <p class="read">How to read it: each fix helps on its own and the two combine. The ordering matches AIC on the training data, which is reassuring: what fitted better in 1990–2014 also forecast better in 2015–2026.</p>
+      </section>
+
+      <!-- 6 -->
+      <section id="questions">
+        <div class="sec-head">
+          <span class="eyebrow">Section 6</span>
+          <h2>Tough questions</h2>
+          <p>Likely questions from the instructor or classmates, with answers you can give in your own words. Each is tagged with what it's really probing.</p>
+        </div>
+        <div class="qa-tools">
+          <button class="chip" type="button" id="openAll">Open all</button>
+          <button class="chip" type="button" id="closeAll">Close all</button>
+        </div>
+        <div class="qa">
+          <details><summary><span>Is GARCH really "non-trivial"? Isn't it just a regression?</span><span class="lvl">course requirements</span></summary>
+            <div class="ans">
+              <p>No. In a regression, the thing you predict is observed. Volatility is never observed; we only see returns. GARCH builds the volatility path through a nonlinear recursion where each day depends on the previous one, and it can only be fitted by maximum likelihood.</p>
+              <p>We derived the likelihoods, wrote the optimizer, the quantile functions and both backtests by hand in NumPy.</p>
+            </div></details>
+
+          <details><summary><span>Why not a neural network or LSTM?</span><span class="lvl">model choice</span></summary>
+            <div class="ans">
+              <p>Three reasons. The course requires building the math from scratch in NumPy, which is realistic for GARCH and not for a deep network. Every GARCH parameter has a plain meaning (reaction, memory, asymmetry, tails) that we can explain and check. And GARCH-family models are still the standard benchmark in risk management.</p>
+              <p>Hansen &amp; Lunde (2005) compared 330 volatility models. GARCH(1,1) was hard to beat for exchange rates, but for stock returns it was beaten by models that allow a leverage effect. That is exactly our revision.</p>
+            </div></details>
+
+          <details><summary><span>You forecast volatility, not prices. What is that useful for?</span><span class="lvl">motivation</span></summary>
+            <div class="ans">
+              <ul>
+                <li>Setting loss limits and capital (Value-at-Risk), which is what banks report to regulators.</li>
+                <li>Sizing positions: hold less when risk is high.</li>
+                <li>Pricing options, whose value depends directly on expected volatility.</li>
+              </ul>
+              <p>Price direction is close to unpredictable; size of moves is predictable. We forecast the part that can be forecast.</p>
+            </div></details>
+
+          <details><summary><span>Why did α drop to almost zero in the revised model?</span><span class="lvl">interpretation</span></summary>
+            <div class="ans">
+              <p>Once the model is allowed a separate reaction to bad days (γ), the data puts nearly all the reaction there. α is the reaction to <em>any</em> surprise; γ is the extra for bad ones. α ≈ 0.001 and γ ≈ 0.141 means good surprises barely raise tomorrow's risk at all.</p>
+              <p>This matches Glosten, Jagannathan &amp; Runkle (1993), who found a similar pattern in US stock returns. It's our "fear is louder than greed" finding.</p>
+            </div></details>
+
+          <details><summary><span>Every model fails the 1% test. Doesn't that mean your revision failed?</span><span class="lvl">honesty</span></summary>
+            <div class="ans">
+              <p>The revision moved every metric in the right direction: 60 → 51 breaches, 6 → 2 breaches in the COVID crash, best log score of all six models. It narrowed the gap but didn't close it, and we say so.</p>
+              <p>Likely reasons the gap remains:</p>
+              <ul>
+                <li>Parameters were frozen at the end of 2014 and never updated through 2026.</li>
+                <li>The test period was wilder than training (kurtosis 16.7 vs 11.3).</li>
+                <li>Even the Student-t with ν ≈ 8 under-predicts the most extreme days (0.17% beyond 4σ vs 0.60% observed).</li>
+                <li>Returns are negatively skewed; our t is symmetric.</li>
+              </ul>
+              <p>Each points to a next revision: rolling re-estimation, a skewed-t, or adding Expected Shortfall.</p>
+            </div></details>
+
+          <details><summary><span>Why do models pass at 5% but fail at 1%?</span><span class="lvl">interpretation</span></summary>
+            <div class="ans">
+              <p>The 5% cutoff sits in the body of the distribution, where a bell curve is a decent approximation. The 1% cutoff sits in the tail, where real returns are much heavier than any of these models assume. Tails are where models struggle and also where the losses are.</p>
+            </div></details>
+
+          <details><summary><span>At 5%, GJR-normal beats your revised model. Why not pick it?</span><span class="lvl">trap</span></summary>
+            <div class="ans">
+              <p>At 5% both pass comfortably (p = 0.84 vs 0.53), so neither is rejected. The Student-t matters most deep in the tail: at 1% the revised model has fewer breaches (51 vs 58), far fewer in the crash (2 vs 5), and a better log score (1.287 vs 1.316). We chose the model that is best overall and in the tail, where risk management cares most.</p>
+              <p>A side fact worth knowing: the t's 5% quantile (−1.610) is slightly <em>less</em> extreme than the normal's (−1.645). Heavy tails put more probability in both the far tail and the center, so the t VaR is a bit tighter at 5% and looser at 1%.</p>
+            </div></details>
+
+          <details><summary><span>The rolling rule had the most cautious average VaR but the most breaches. How?</span><span class="lvl">aha moment</span></summary>
+            <div class="ans">
+              <p>Timing. The 250-day window reacts slowly: going into a crash it still reflects the calm year before, so it breaches repeatedly (12 times in Feb–Apr 2020). After the crash it remembers the turmoil for a full year and stays too cautious when markets have calmed. Being cautious on average doesn't help if the caution shows up at the wrong time.</p>
+              <p>That's the "a calm year makes you underestimate tomorrow" message, shown with real numbers.</p>
+            </div></details>
+
+          <details><summary><span>Is there look-ahead bias?</span><span class="lvl">methodology</span></summary>
+            <div class="ans">
+              <p>No. All parameters (μ, ω, α, γ, β, ν) are fitted on 1990–2014 only. Each test-day forecast uses only returns through the previous day. The test data never touches the fitting step.</p>
+            </div></details>
+
+          <details><summary><span>Why not re-estimate the model every day or every year?</span><span class="lvl">methodology</span></summary>
+            <div class="ans">
+              <p>We kept one fit to make the comparison simple and the test harder: if the revised model wins with settings frozen in 2014, it's not because it was re-tuned. Rolling re-estimation is a standard next step and would likely reduce breaches for all models.</p>
+            </div></details>
+
+          <details><summary><span>Why 1990–2014 for training and 2015–2026 for testing?</span><span class="lvl">design</span></summary>
+            <div class="ans">
+              <p>Training covers 25 years and several crises (1998, the 2000–02 dot-com crash, 2008), so the model has seen bad times. Testing covers over 11 years the model never saw, including 2018, the COVID crash, the 2022 sell-off and April 2025. About two-thirds train, one-third test.</p>
+            </div></details>
+
+          <details><summary><span>Why Nelder–Mead instead of gradient descent or BFGS?</span><span class="lvl">implementation</span></summary>
+            <div class="ans">
+              <p>It needs no derivatives. Gradients of the GARCH likelihood have to run back through the whole recursion, which is error-prone to derive and code by hand. With only 4–6 parameters, Nelder–Mead is reliable and fast enough. SciPy's optimizers aren't allowed in the course, so we wrote it ourselves (about 30 lines).</p>
+            </div></details>
+
+          <details><summary><span>How do you know the optimizer found the real maximum?</span><span class="lvl">implementation</span></summary>
+            <div class="ans">
+              <ul>
+                <li>Restarts from the best point with a smaller simplex until the score stops improving.</li>
+                <li>A parameter-recovery test on 8,000 simulated days with known settings.</li>
+                <li>Results are in the typical range for daily US stocks (persistence ≈ 0.99, ν ≈ 7–8).</li>
+                <li>The likelihood ordering of the four variants is consistent across models.</li>
+              </ul>
+            </div></details>
+
+          <details><summary><span>How do you keep the parameters valid (positive, stationary)?</span><span class="lvl">implementation</span></summary>
+            <div class="ans">
+              <p>Reparameterization. The optimizer searches over unrestricted numbers, which we convert using exponentials and a softmax-like share so that ω &gt; 0, every coefficient ≥ 0, α + γ/2 + β &lt; 1 and ν &gt; 2 hold automatically. A test checks this on 1,000 random draws.</p>
+            </div></details>
+
+          <details><summary><span>Why the Student-t and not another heavy-tailed distribution?</span><span class="lvl">model choice</span></summary>
+            <div class="ans">
+              <p>It's the standard choice since Bollerslev (1987), adds just one parameter, and contains the normal as a limit (ν → ∞), so the comparison stays clean. A skewed-t would also capture the negative skew we measured (−0.40 in testing) and is a reasonable next revision.</p>
+            </div></details>
+
+          <details><summary><span>Is the improvement statistically significant?</span><span class="lvl">don't overclaim</span></summary>
+            <div class="ans">
+              <p>In-sample, clearly: the likelihood ratio is about 392 for two extra parameters, and AIC and BIC both drop by roughly 380–390. Out-of-sample, the revised model wins on breaches, crash breaches and log score, but we haven't yet run a formal test of the log-score gap (a Diebold–Mariano test). That's planned.</p>
+            </div></details>
+
+          <details><summary><span>What does ν ≈ 8 actually mean?</span><span class="lvl">interpretation</span></summary>
+            <div class="ans">
+              <p>Moderately heavy tails. Under a normal curve a 4-sigma day happens about 0.006% of the time; under our fitted t, about 0.17%, roughly 27 times more often. Real data shows 0.60%, so the t is much closer than the normal but still short.</p>
+            </div></details>
+
+          <details><summary><span>What does a persistence of 0.99 mean in practice?</span><span class="lvl">interpretation</span></summary>
+            <div class="ans">
+              <p>Each day, about 99% of the extra risk from a shock carries into the next day. Half of it is gone after about 64 trading days, roughly three months. That's why risk stayed elevated for months after March 2020.</p>
+            </div></details>
+
+          <details><summary><span>Is β here the same as a stock's beta?</span><span class="lvl">trap</span></summary>
+            <div class="ans">
+              <p>No. CAPM beta measures how a stock moves with the market. GARCH β is the memory of volatility: how much of today's variance carries over to tomorrow. Same Greek letter, unrelated ideas.</p>
+            </div></details>
+
+          <details><summary><span>Why include EWMA and a rolling window?</span><span class="lvl">design</span></summary>
+            <div class="ans">
+              <p>They show what practitioners do without a fitted model. The rolling window is the simplest "past year" approach. EWMA (RiskMetrics, λ = 0.94) is a longtime industry standard and turns out to be GARCH with ω = 0 and persistence fixed at 1. Beating them shows that fitting from data adds value.</p>
+            </div></details>
+
+          <details><summary><span>Why the French data and not Yahoo Finance or the S&amp;P 500?</span><span class="lvl">data</span></summary>
+            <div class="ans">
+              <p>It's free, documented, stable and cited across finance research, so the results are reproducible. Yahoo's download tool is unofficial and changes without notice. FRED provides only the last 10 years of S&amp;P 500 data. The French market return covers all US-listed stocks weighted by size, so it behaves much like the S&amp;P 500.</p>
+            </div></details>
+
+          <details><summary><span>Your results are for one market. Do they generalize?</span><span class="lvl">limitations</span></summary>
+            <div class="ans">
+              <p>Fair point, and we say so. The patterns we exploit (clustering, heavy tails, asymmetry) are documented across many equity markets (Cont, 2001), so we expect the direction to hold. A planned robustness check reruns the backtest on the 12 French industry portfolios.</p>
+            </div></details>
+
+          <details><summary><span>GARCH is from 1986. What's new in your paper?</span><span class="lvl">contribution</span></summary>
+            <div class="ans">
+              <ul>
+                <li>A complete, transparent from-scratch implementation: likelihoods, optimizer, quantiles and backtests in NumPy only.</li>
+                <li>A clean original-vs-revised comparison that isolates each fix (four nested models).</li>
+                <li>A test period through August 2026, including COVID and the 2025 swings.</li>
+                <li>A plain-language explanation of why each fix works, aimed at learners.</li>
+              </ul>
+            </div></details>
+
+          <details><summary><span>Why model returns in percent?</span><span class="lvl">implementation</span></summary>
+            <div class="ans">
+              <p>Numerical stability. In decimals, daily variance is around 0.0001 and ω around 0.000001, which makes the optimizer's job harder. In percent, the numbers are near 1.</p>
+            </div></details>
+
+          <details><summary><span>Why is the mean return μ held constant?</span><span class="lvl">assumptions</span></summary>
+            <div class="ans">
+              <p>Daily expected returns are tiny (0.04%) compared with daily volatility (1.1%), and return autocorrelation is near zero. Modeling the mean in more detail would barely change the VaR. Volatility is what moves.</p>
+            </div></details>
+
+          <details><summary><span>What does VaR not tell you?</span><span class="lvl">limitations</span></summary>
+            <div class="ans">
+              <p>How bad the loss is once the limit is crossed. A 1% VaR of −2.5% is consistent with a −3% or a −12% day. Expected Shortfall (the average loss beyond VaR) addresses this, and is a natural extension.</p>
+            </div></details>
+        </div>
+      </section>
+
+      <!-- 7 -->
+      <section id="words">
+        <div class="sec-head">
+          <span class="eyebrow">Section 7</span>
+          <h2>Say this, not that</h2>
+          <p>Small wording slips invite hard follow-up questions. These are the ones to watch.</p>
+        </div>
+        <div class="pairs">
+          <div class="pair"><div class="no">"Our model predicts the market."</div><div class="yes">"Our model forecasts how big tomorrow's moves are likely to be."</div></div>
+          <div class="pair"><div class="no">"VaR is the worst we can lose."</div><div class="yes">"VaR is a loss we expect to exceed on about 1 day in 100."</div></div>
+          <div class="pair"><div class="no">"The revised model passed the backtests."</div><div class="yes">"It passed at 5%. At 1% every model failed; the revised one came closest."</div></div>
+          <div class="pair"><div class="no">"p = 0.53 means 53% chance the model is right."</div><div class="yes">"p = 0.53 means the breach count is well within what chance alone would produce."</div></div>
+          <div class="pair"><div class="no">"Good news has no effect."</div><div class="yes">"Good surprises barely raise tomorrow's volatility in our fitted model."</div></div>
+          <div class="pair"><div class="no">"Returns are normal with changing variance."</div><div class="yes">"The standardized shocks are assumed normal in the original and Student-t in the revised model."</div></div>
+          <div class="pair"><div class="no">"The improvement is significant."</div><div class="yes">"In-sample it's large by every measure. Out-of-sample it wins on every metric we report; a formal test is planned."</div></div>
+          <div class="pair"><div class="no">"We used regression to fit it."</div><div class="yes">"We fitted it by maximum likelihood with our own Nelder–Mead optimizer."</div></div>
+        </div>
+      </section>
+
+      <!-- 8 -->
+      <section id="formulas">
+        <div class="sec-head">
+          <span class="eyebrow">Section 8</span>
+          <h2>Formula sheet</h2>
+          <p>Every equation in the study, in the order the pipeline uses them.</p>
+        </div>
+        <div class="formulas">
+          <div class="f"><div class="fname">Return model<small>shock = volatility × standard shock</small></div><div class="fmath">\[ r_t = \mu + e_t,\qquad e_t = \sigma_t z_t,\qquad z_t \overset{iid}{\sim} (0,1) \]</div></div>
+          <div class="f"><div class="fname">Original: GARCH(1,1)<small>Bollerslev (1986)</small></div><div class="fmath">\[ \sigma_t^2 = \omega + \alpha e_{t-1}^2 + \beta\sigma_{t-1}^2,\qquad z_t \sim N(0,1) \]</div></div>
+          <div class="f"><div class="fname">Revised: GJR-GARCH(1,1)-t<small>Glosten et al. (1993), Bollerslev (1987)</small></div><div class="fmath">\[ \sigma_t^2 = \omega + \big(\alpha + \gamma\,\mathbb{1}[e_{t-1}&lt;0]\big)e_{t-1}^2 + \beta\sigma_{t-1}^2,\qquad z_t \sim t_\nu\sqrt{\tfrac{\nu-2}{\nu}} \]</div></div>
+          <div class="f"><div class="fname">Constraints</div><div class="fmath">\[ \omega&gt;0,\quad \alpha,\gamma,\beta\ge0,\quad \alpha+\tfrac{\gamma}{2}+\beta&lt;1,\quad \nu&gt;2 \]</div></div>
+          <div class="f"><div class="fname">Long-run variance &amp; half-life</div><div class="fmath">\[ \bar\sigma^2 = \frac{\omega}{1-(\alpha+\gamma/2+\beta)},\qquad h = \frac{\ln 0.5}{\ln(\alpha+\gamma/2+\beta)} \]</div></div>
+          <div class="f"><div class="fname">Normal −log-likelihood</div><div class="fmath">\[ -\ell = \tfrac12\sum_t\Big[\ln2\pi + \ln\sigma_t^2 + \frac{e_t^2}{\sigma_t^2}\Big] \]</div></div>
+          <div class="f"><div class="fname">Student-t log-likelihood (one day)</div><div class="fmath">\[ \ell_t = \ln\Gamma\!\big(\tfrac{\nu+1}{2}\big)-\ln\Gamma\!\big(\tfrac{\nu}{2}\big)-\tfrac12\ln\!\big(\pi(\nu-2)\big)-\tfrac12\ln\sigma_t^2-\tfrac{\nu+1}{2}\ln\!\Big(1+\frac{e_t^2}{\sigma_t^2(\nu-2)}\Big) \]</div></div>
+          <div class="f"><div class="fname">Reparameterization</div><div class="fmath">\[ \omega=e^{z_0},\quad [\alpha,\tfrac{\gamma}{2},\beta]=\frac{e^{z_{1:3}}}{1+\sum e^{z_{1:3}}},\quad \nu=2+e^{z_4} \]</div></div>
+          <div class="f"><div class="fname">AIC / BIC</div><div class="fmath">\[ \text{AIC}=2(-\ell)+2k,\qquad \text{BIC}=2(-\ell)+k\ln n \]</div></div>
+          <div class="f"><div class="fname">Value-at-Risk</div><div class="fmath">\[ \text{VaR}_t^{(p)} = \mu + q_p\,\sigma_t,\qquad q_{0.01}=-2.326\ (N),\ -2.509\ (t_8) \]</div></div>
+          <div class="f"><div class="fname">Kupiec (unconditional coverage)<small>x breaches in n days</small></div><div class="fmath">\[ LR_{uc} = -2\Big[(n-x)\ln(1-p)+x\ln p-(n-x)\ln(1-\hat p)-x\ln\hat p\Big]\sim\chi^2_1 \]</div></div>
+          <div class="f"><div class="fname">Christoffersen (conditional coverage)<small>n<sub>ij</sub> = days in state i followed by j</small></div><div class="fmath">\[ LR_{ind} = -2\ln\frac{(1-\pi)^{n_{00}+n_{10}}\pi^{n_{01}+n_{11}}}{(1-\pi_{01})^{n_{00}}\pi_{01}^{n_{01}}(1-\pi_{11})^{n_{10}}\pi_{11}^{n_{11}}},\qquad LR_{cc}=LR_{uc}+LR_{ind}\sim\chi^2_2 \]</div></div>
+          <div class="f"><div class="fname">χ² p-values without SciPy</div><div class="fmath">\[ P(\chi^2_1&gt;x)=\operatorname{erfc}\!\big(\sqrt{x/2}\big),\qquad P(\chi^2_2&gt;x)=e^{-x/2} \]</div></div>
+          <div class="f"><div class="fname">EWMA benchmark</div><div class="fmath">\[ \sigma_t^2 = (1-\lambda)e_{t-1}^2 + \lambda\sigma_{t-1}^2,\qquad \lambda = 0.94 \]</div></div>
+        </div>
+      </section>
+
+      <!-- 9 -->
+      <section id="sources">
+        <div class="sec-head">
+          <span class="eyebrow">Section 9</span>
+          <h2>Who said what</h2>
+          <p>If someone asks "where does that come from?", this is the source to name.</p>
+        </div>
+        <div class="refs">
+          <div class="ref"><b>Engle (1982)</b><span>Invented ARCH: variance that depends on past squared shocks.</span></div>
+          <div class="ref"><b>Bollerslev (1986)</b><span>GARCH: adds past variance, so one term captures long memory. Our original model.</span></div>
+          <div class="ref"><b>Bollerslev (1987)</b><span>GARCH with Student-t shocks for heavy tails. Half of our revision. (Held for Draft 2.)</span></div>
+          <div class="ref"><b>Glosten, Jagannathan &amp; Runkle (1993)</b><span>The γ term: bad news raises volatility more. The other half of our revision.</span></div>
+          <div class="ref"><b>Kupiec (1995)</b><span>Unconditional coverage test: is the breach count right?</span></div>
+          <div class="ref"><b>Christoffersen (1998)</b><span>Conditional coverage: are breaches also independent?</span></div>
+          <div class="ref"><b>Hansen &amp; Lunde (2005)</b><span>Compared 330 volatility models: GARCH(1,1) is hard to beat for currencies, but for stock returns it loses to models with a leverage effect.</span></div>
+          <div class="ref"><b>Cont (2001)</b><span>The stylized facts of returns: heavy tails, clustering, asymmetry. (Held for Draft 2.)</span></div>
+          <div class="ref"><b>Nelder &amp; Mead (1965)</b><span>The simplex optimizer we implemented. (Held for Draft 2.)</span></div>
+          <div class="ref"><b>Harris et al. (2020)</b><span>NumPy, the only numerical library we use. (Held for Draft 2.)</span></div>
+          <div class="ref"><b>French (2026)</b><span>The data library our returns come from.</span></div>
+        </div>
+        <p class="note">Terms mentioned on this page but not yet in our reference list: Black (1976) on the leverage effect, J.P. Morgan RiskMetrics (1996), Diebold &amp; Mariano (1995), and the Basel traffic-light rules. If we use them in the paper, add the citations first.</p>
+      </section>
+
+      <!-- 10 -->
+      <section id="drill">
+        <div class="sec-head">
+          <span class="eyebrow">Section 10</span>
+          <h2>Flashcard drill</h2>
+          <p>Say the plain meaning out loud before you reveal it. Cards are drawn from the glossary above, filtered by the same topic chips.</p>
+        </div>
+        <div class="card-q" id="card">
+          <span class="eyebrow" id="cardCat"></span>
+          <div class="front" id="cardFront"></div>
+          <div class="back" id="cardBack" hidden></div>
+          <div class="card-actions">
+            <button class="btn" type="button" id="reveal">Reveal</button>
+            <button class="btn ghost" type="button" id="gotIt" hidden>I knew it</button>
+            <button class="btn ghost" type="button" id="next">Next card</button>
+          </div>
+          <span class="score" id="score"></span>
+        </div>
+      </section>
+    </main>
+  </div>
+</div>
+
+<script>
+(function () {
+  // ---------- Feel the model (parameters fitted on 1990–2014) ----------
+  var P = {
+    o: { mu: 0.04351, omega: 0.01231, alpha: 0.08404, gamma: 0, beta: 0.90572, q: -2.32635 },
+    r: { mu: 0.04351, omega: 0.01155, alpha: 0.00084, gamma: 0.14083, beta: 0.91799, q: -2.50911 }
+  };
+  var shock = document.getElementById("shock"), sig = document.getElementById("sig");
+  function nextSigma(p, e, s) {
+    return Math.sqrt(p.omega + (p.alpha + (e < 0 ? p.gamma : 0)) * e * e + p.beta * s * s);
+  }
+  function fmt(x) { return (x < 0 ? "−" : "") + Math.abs(x).toFixed(2) + "%"; }
+  function render() {
+    var e = parseFloat(shock.value), s = parseFloat(sig.value);
+    document.getElementById("shockOut").textContent = (e < 0 ? "−" : e > 0 ? "+" : "") + Math.abs(e).toFixed(1) + "%";
+    document.getElementById("sigOut").textContent = s.toFixed(2) + "%";
+    var so = nextSigma(P.o, e, s), sr = nextSigma(P.r, e, s);
+    var vo = P.o.mu + P.o.q * so, vr = P.r.mu + P.r.q * sr;
+    var maxS = Math.max(so, sr, 1.5) * 1.15, maxV = Math.max(-vo, -vr, 3) * 1.15;
+    document.getElementById("b1").style.width = (so / maxS * 100) + "%";
+    document.getElementById("b2").style.width = (sr / maxS * 100) + "%";
+    document.getElementById("b3").style.width = (-vo / maxV * 100) + "%";
+    document.getElementById("b4").style.width = (-vr / maxV * 100) + "%";
+    document.getElementById("v1").textContent = so.toFixed(2) + "%";
+    document.getElementById("v2").textContent = sr.toFixed(2) + "%";
+    document.getElementById("v3").textContent = fmt(vo);
+    document.getElementById("v4").textContent = fmt(vr);
+    var msg;
+    if (Math.abs(e) < 0.3) {
+      msg = "A quiet day: both models let risk drift a little toward its long-run level (about 1.05%).";
+    } else if (e < 0) {
+      msg = "A bad day. The revised model reacts more (" + sr.toFixed(2) + "% vs " + so.toFixed(2) + "%) because its γ term switches on after losses. Its loss limit is also wider because the Student-t expects bigger extremes.";
+    } else {
+      msg = "A good day. The original model treats it like a loss of the same size and raises risk to " + so.toFixed(2) + "%. The revised model barely reacts (" + sr.toFixed(2) + "%): good surprises add almost nothing.";
+    }
+    document.getElementById("readout").textContent = msg;
+  }
+  shock.addEventListener("input", render);
+  sig.addEventListener("input", render);
+  document.querySelectorAll(".presets .chip").forEach(function (b) {
+    b.addEventListener("click", function () {
+      shock.value = b.dataset.e; sig.value = b.dataset.s; render();
+    });
+  });
+  render();
+
+  // ---------- Glossary search + topic filter ----------
+  var terms = Array.prototype.slice.call(document.querySelectorAll(".term"));
+  var groups = Array.prototype.slice.call(document.querySelectorAll(".group"));
+  var q = document.getElementById("q"), cat = "all";
+  var catNames = { data: "Data & returns", risk: "Risk & volatility", dist: "Distributions", model: "The models", fit: "Fitting", test: "Testing" };
+  terms.forEach(function (t) { t.dataset.text = t.textContent.toLowerCase(); });
+  function filter() {
+    var s = q.value.trim().toLowerCase(), n = 0;
+    terms.forEach(function (t) {
+      var show = (cat === "all" || t.dataset.cat === cat) && (!s || t.dataset.text.indexOf(s) !== -1);
+      t.hidden = !show; if (show) n++;
+    });
+    groups.forEach(function (g) { g.hidden = !g.querySelector(".term:not([hidden])"); });
+    document.getElementById("count").textContent = n + " of " + terms.length + " terms";
+    document.getElementById("nohits").hidden = n > 0;
+  }
+  q.addEventListener("input", filter);
+  document.querySelectorAll(".cats .chip").forEach(function (b) {
+    b.addEventListener("click", function () {
+      cat = b.dataset.cat;
+      document.querySelectorAll(".cats .chip").forEach(function (x) { x.setAttribute("aria-pressed", x === b ? "true" : "false"); });
+      filter(); deal();
+    });
+  });
+  filter();
+
+  // ---------- Q&A open/close ----------
+  document.getElementById("openAll").addEventListener("click", function () { document.querySelectorAll(".qa details").forEach(function (d) { d.open = true; }); });
+  document.getElementById("closeAll").addEventListener("click", function () { document.querySelectorAll(".qa details").forEach(function (d) { d.open = false; }); });
+
+  // ---------- Flashcards ----------
+  var known = 0, seen = 0, current = null, last = null;
+  var front = document.getElementById("cardFront"), back = document.getElementById("cardBack");
+  var reveal = document.getElementById("reveal"), gotIt = document.getElementById("gotIt");
+  function pool() { return terms.filter(function (t) { return cat === "all" || t.dataset.cat === cat; }); }
+  function deal() {
+    var p = pool(); if (!p.length) return;
+    do { current = p[Math.floor(Math.random() * p.length)]; } while (p.length > 1 && current === last);
+    last = current;
+    var h = current.querySelector("h4").cloneNode(true);
+    var aka = h.querySelector(".aka"); if (aka) aka.remove();
+    front.textContent = h.textContent.trim();
+    document.getElementById("cardCat").textContent = catNames[current.dataset.cat];
+    back.innerHTML = "";
+    var plain = current.querySelector(".plain").cloneNode(true); back.appendChild(plain);
+    var dts = current.querySelectorAll(".facets dt");
+    dts.forEach(function (dt) {
+      if (dt.textContent === "In our paper") {
+        var pp = document.createElement("p");
+        pp.innerHTML = "<strong>In our paper:</strong> " + dt.nextElementSibling.innerHTML;
+        back.appendChild(pp);
+      }
+    });
+    back.hidden = true; reveal.hidden = false; gotIt.hidden = true;
+  }
+  reveal.addEventListener("click", function () {
+    back.hidden = false; reveal.hidden = true; gotIt.hidden = false; seen++;
+    if (window.MathJax && MathJax.typesetPromise) MathJax.typesetPromise([back]).catch(function () {});
+    score();
+  });
+  gotIt.addEventListener("click", function () { known++; score(); deal(); });
+  document.getElementById("next").addEventListener("click", deal);
+  function score() { document.getElementById("score").textContent = seen ? ("Knew " + known + " of " + seen + " revealed") : ""; }
+  deal();
+})();
+</script>
+</body>
+</html>

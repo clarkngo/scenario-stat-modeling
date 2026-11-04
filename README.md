@@ -9,6 +9,7 @@ We derive GARCH(1,1) from first principles, implement it and its maximum-likelih
 
 - Portal: https://clarkngo.github.io/scenario-stat-modeling/
 - Slides: https://clarkngo.github.io/scenario-stat-modeling/presentations/ds623-scenario-stat-modeling.html
+- Study guide (terms, our numbers, likely questions): https://clarkngo.github.io/scenario-stat-modeling/presentations/defense-guide.html
 
 ## GARCH study (chosen project direction)
 
